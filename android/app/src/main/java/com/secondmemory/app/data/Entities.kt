@@ -1,0 +1,157 @@
+package com.secondmemory.app.data
+
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+import com.secondmemory.app.domain.ActivityEvent
+import com.secondmemory.app.domain.Category
+import com.secondmemory.app.domain.ContentType
+import com.secondmemory.app.domain.Priority
+import com.secondmemory.app.domain.ProcessingStatus
+import com.secondmemory.app.domain.Thing
+import com.secondmemory.app.domain.ThingStatus
+
+@Entity(tableName = "things")
+data class ThingEntity(
+    @PrimaryKey val id: String,
+    val createdAt: Long,
+    val updatedAt: Long,
+    val originalContent: String,
+    val contentType: String,
+    val sourceUrl: String?,
+    val sourceApp: String?,
+    val title: String,
+    val summary: String?,
+    val notes: String?,
+    val imageUri: String?,
+    val mimeType: String?,
+    val category: String,
+    val status: String,
+    val priority: String,
+    val dueAt: Long?,
+    val resurfaceAt: Long?,
+    val completedAt: Long?,
+    val archivedAt: Long?,
+    val lastOpenedAt: Long?,
+    val lastResurfacedAt: Long?,
+    val resurfaceCount: Int,
+    val isPinned: Boolean,
+    val isFavourite: Boolean,
+    val aiProcessed: Boolean,
+    val aiConfidence: Float?,
+    val aiProvider: String?,
+    val processingStatus: String,
+    val processingError: String?,
+    val tags: String,
+    val detectedAction: String?,
+    val detectedDate: String?,
+    val detectedTime: String?,
+    val detectedLocation: String?,
+    val detectedPerson: String?,
+    val estimatedReadMinutes: Int?,
+    val suggestedNotificationText: String?,
+    val reasonForResurface: String?,
+    val ocrText: String?,
+    val siteName: String?,
+)
+
+@Entity(tableName = "activities")
+data class ActivityEntity(
+    @PrimaryKey val id: String,
+    val at: Long,
+    val type: String,
+    val thingId: String?,
+    val title: String?,
+    val detail: String?,
+)
+
+fun ThingEntity.toDomain(): Thing = Thing(
+    id = id,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+    originalContent = originalContent,
+    contentType = runCatching { ContentType.valueOf(contentType) }.getOrDefault(ContentType.TEXT),
+    sourceUrl = sourceUrl,
+    sourceApp = sourceApp,
+    title = title,
+    summary = summary,
+    notes = notes,
+    imageUri = imageUri,
+    mimeType = mimeType,
+    category = runCatching { Category.valueOf(category) }.getOrDefault(Category.UNKNOWN),
+    status = runCatching { ThingStatus.valueOf(status) }.getOrDefault(ThingStatus.INBOX),
+    priority = runCatching { Priority.valueOf(priority) }.getOrDefault(Priority.NORMAL),
+    dueAt = dueAt,
+    resurfaceAt = resurfaceAt,
+    completedAt = completedAt,
+    archivedAt = archivedAt,
+    lastOpenedAt = lastOpenedAt,
+    lastResurfacedAt = lastResurfacedAt,
+    resurfaceCount = resurfaceCount,
+    isPinned = isPinned,
+    isFavourite = isFavourite,
+    aiProcessed = aiProcessed,
+    aiConfidence = aiConfidence,
+    aiProvider = aiProvider,
+    processingStatus = runCatching { ProcessingStatus.valueOf(processingStatus) }.getOrDefault(ProcessingStatus.NONE),
+    processingError = processingError,
+    tags = if (tags.isBlank()) emptyList() else tags.split("|").filter { it.isNotBlank() },
+    detectedAction = detectedAction,
+    detectedDate = detectedDate,
+    detectedTime = detectedTime,
+    detectedLocation = detectedLocation,
+    detectedPerson = detectedPerson,
+    estimatedReadMinutes = estimatedReadMinutes,
+    suggestedNotificationText = suggestedNotificationText,
+    reasonForResurface = reasonForResurface,
+    ocrText = ocrText,
+    siteName = siteName,
+)
+
+fun Thing.toEntity(): ThingEntity = ThingEntity(
+    id = id,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+    originalContent = originalContent,
+    contentType = contentType.name,
+    sourceUrl = sourceUrl,
+    sourceApp = sourceApp,
+    title = title,
+    summary = summary,
+    notes = notes,
+    imageUri = imageUri,
+    mimeType = mimeType,
+    category = category.name,
+    status = status.name,
+    priority = priority.name,
+    dueAt = dueAt,
+    resurfaceAt = resurfaceAt,
+    completedAt = completedAt,
+    archivedAt = archivedAt,
+    lastOpenedAt = lastOpenedAt,
+    lastResurfacedAt = lastResurfacedAt,
+    resurfaceCount = resurfaceCount,
+    isPinned = isPinned,
+    isFavourite = isFavourite,
+    aiProcessed = aiProcessed,
+    aiConfidence = aiConfidence,
+    aiProvider = aiProvider,
+    processingStatus = processingStatus.name,
+    processingError = processingError,
+    tags = tags.joinToString("|"),
+    detectedAction = detectedAction,
+    detectedDate = detectedDate,
+    detectedTime = detectedTime,
+    detectedLocation = detectedLocation,
+    detectedPerson = detectedPerson,
+    estimatedReadMinutes = estimatedReadMinutes,
+    suggestedNotificationText = suggestedNotificationText,
+    reasonForResurface = reasonForResurface,
+    ocrText = ocrText,
+    siteName = siteName,
+)
+
+fun ActivityEntity.toDomain(): ActivityEvent =
+    ActivityEvent(id, at, type, thingId, title, detail)
+
+fun ActivityEvent.toEntity(): ActivityEntity =
+    ActivityEntity(id, at, type, thingId, title, detail)

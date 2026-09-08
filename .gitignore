@@ -1,0 +1,41 @@
+# dependencies
+node_modules/
+
+# env / local ids
+.project_id
+.github_repo
+.env
+.env.*
+local.properties
+
+# android sdk, gradle, build output
+.android-sdk/
+.gradle/
+**/.gradle/
+**/build/
+**/.kotlin/
+android/local.properties
+*.apk
+*.aab
+*.ap_
+*.dex
+*.so
+*.keystore
+*.jks
+
+# generated / sandbox
+artifacts/
+dist/
+.output/
+.tanstack/
+.vercel/
+.grok/
+screenshots/
+attachments/
+
+# logs and caches
+*.log
+.DS_Store
+*.iml
+.idea/
+.vscode/

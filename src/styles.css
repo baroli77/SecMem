@@ -1,0 +1,164 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@theme inline {
+  --font-sans: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Newsreader", "Iowan Old Style", "Palatino Linotype", serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-2xl: 28px;
+}
+
+:root {
+  --background: #f3efe6;
+  --foreground: #1a1814;
+  --card: #faf8f3;
+  --card-foreground: #1a1814;
+  --muted: #e7e1d4;
+  --muted-foreground: #6a655c;
+  --border: color-mix(in oklab, #1a1814 11%, transparent);
+  --primary: #2c5c4f;
+  --primary-foreground: #f3efe6;
+  --secondary: #ece6d9;
+  --secondary-foreground: #1a1814;
+  --accent: #2c5c4f;
+  --accent-foreground: #f3efe6;
+  --destructive: #8f3d32;
+  --destructive-foreground: #faf8f3;
+  --ring: #2c5c4f;
+  --input: color-mix(in oklab, #1a1814 14%, transparent);
+  --popover: #faf8f3;
+  --popover-foreground: #1a1814;
+  --paper: #f3efe6;
+  --ink: #1a1814;
+  --shadow-border:
+    0px 0px 0px 1px rgba(26, 24, 20, 0.06),
+    0px 1px 2px -1px rgba(26, 24, 20, 0.06),
+    0px 2px 4px 0px rgba(26, 24, 20, 0.04);
+  --shadow-border-hover:
+    0px 0px 0px 1px rgba(26, 24, 20, 0.1),
+    0px 1px 2px -1px rgba(26, 24, 20, 0.08),
+    0px 4px 10px 0px rgba(26, 24, 20, 0.06);
+
+  --motion-stagger: 40ms;
+  --motion-micro: 80ms;
+  --motion-quick: 150ms;
+  --motion-fast: 250ms;
+  --motion-medium: 350ms;
+  --motion-slow: 400ms;
+  --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+html.dark {
+  --background: #12110e;
+  --foreground: #ece8df;
+  --card: #1c1a16;
+  --card-foreground: #ece8df;
+  --muted: #26231e;
+  --muted-foreground: #9a958a;
+  --border: color-mix(in oklab, #ece8df 12%, transparent);
+  --primary: #8fb9a8;
+  --primary-foreground: #12110e;
+  --secondary: #23211c;
+  --secondary-foreground: #ece8df;
+  --accent: #8fb9a8;
+  --accent-foreground: #12110e;
+  --destructive: #d48b80;
+  --destructive-foreground: #12110e;
+  --ring: #8fb9a8;
+  --input: color-mix(in oklab, #ece8df 16%, transparent);
+  --popover: #1c1a16;
+  --popover-foreground: #ece8df;
+  --paper: #12110e;
+  --ink: #ece8df;
+  --shadow-border: 0 0 0 1px rgba(236, 232, 223, 0.08);
+  --shadow-border-hover: 0 0 0 1px rgba(236, 232, 223, 0.14);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html,
+  body,
+  #app {
+    min-height: 100%;
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+    font-family: var(--font-display);
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 28%, transparent);
+    color: var(--foreground);
+  }
+
+  img.thumb {
+    outline: 1px solid color-mix(in oklab, var(--foreground) 12%, transparent);
+    outline-offset: -1px;
+  }
+
+  kbd {
+    font-family: var(--font-mono);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

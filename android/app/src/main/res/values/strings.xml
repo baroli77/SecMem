@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Second Memory</string>
+    <string name="share_label">Second Memory</string>
+    <string name="tagline">Share it. Pin it. It stays until you unpin it.</string>
+    <string name="channel_pins_name">Pinned</string>
+    <string name="channel_pins_desc">Pinned items stay here until you unpin them.</string>
+    <string name="channel_resurface_name">Pinned</string>
+    <string name="channel_resurface_desc">Pinned items stay here until you unpin them.</string>
+    <string name="notif_done">Done</string>
+    <string name="notif_later">Later</string>
+    <string name="notif_unpin">Unpin</string>
+    <string name="notif_open">Open</string>
+    <string name="saved_toast">Saved</string>
+    <string name="welcome_notif_title">Pins will live here</string>
+    <string name="welcome_notif_body">Anything you share or pin stays in this shade until you unpin it. No schedule. No nagging.</string>
+    <string name="swipe_hint">Swipe right to mark done. Swipe left to unpin.</string>
+</resources>

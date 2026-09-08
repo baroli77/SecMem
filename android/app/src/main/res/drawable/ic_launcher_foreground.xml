@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Scaled from the 32×32 mark into the 72dp adaptive safe zone. -->
+    <path
+        android:fillColor="#F3EFE6"
+        android:pathData="M32.9,29.3 h36 a5.6,5.6 0 0 1 5.6,5.6 v33.8 a5.6,5.6 0 0 1 -5.6,5.6 h-36 a5.6,5.6 0 0 1 -5.6,-5.6 v-33.8 a5.6,5.6 0 0 1 5.6,-5.6 z" />
+    <path
+        android:fillColor="#2C5C4F"
+        android:pathData="M45.2,37.1 h36 a5.6,5.6 0 0 1 5.6,5.6 v33.8 a5.6,5.6 0 0 1 -5.6,5.6 h-36 a5.6,5.6 0 0 1 -5.6,-5.6 v-33.8 a5.6,5.6 0 0 1 5.6,-5.6 z" />
+</vector>
