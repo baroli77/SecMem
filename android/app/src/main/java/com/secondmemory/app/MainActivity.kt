@@ -18,6 +18,7 @@ import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private val openThingId = mutableStateOf<String?>(null)
+    private val openCapture = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -27,7 +28,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             val vm: MemoryViewModel = viewModel(factory = MemoryViewModel.factory(repo))
             val openId by openThingId
-            SecondMemoryAppUi(vm = vm, initialThingId = openId)
+            val capture by openCapture
+            SecondMemoryAppUi(vm = vm, initialThingId = openId, openCapture = capture, onCaptureConsumed = { openCapture.value = false })
         }
     }
 
@@ -40,7 +42,10 @@ class MainActivity : ComponentActivity() {
     private fun handleOpen(intent: Intent?) {
         val id = intent?.getStringExtra(NotificationHelper.EXTRA_THING_ID)
         openThingId.value = id
-        if (id == null || intent.getBooleanExtra(NotificationHelper.EXTRA_OPEN_CONTENT, false).not()) return
+        if (intent?.getBooleanExtra("openCapture", false) == true) {
+            openCapture.value = true
+        }
+        if (id.isNullOrBlank() || intent?.getBooleanExtra(NotificationHelper.EXTRA_OPEN_CONTENT, false) != true) return
         val repo = (application as SecondMemoryApp).container.repository
         lifecycleScope.launch {
             val thing = withContext(Dispatchers.IO) {

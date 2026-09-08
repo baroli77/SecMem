@@ -77,17 +77,33 @@ class MemoryViewModel(private val repo: MemoryRepository) : ViewModel() {
     fun movePin(id: String, delta: Int) = viewModelScope.launch { repo.movePin(id, delta) }
     fun syncShade(context: Context) = viewModelScope.launch { ShadeSync.refresh(context, repo) }
 
-    fun exportBackup(context: Context, uri: android.net.Uri, password: String?) = viewModelScope.launch {
-        val json = com.secondmemory.app.data.Backup.snapshot(things.value, settings.value)
-        val bytes = com.secondmemory.app.data.Backup.pack(context, json, password)
-        com.secondmemory.app.data.Backup.write(context, uri, bytes)
+    fun exportBackup(
+        context: Context,
+        uri: android.net.Uri,
+        password: String?,
+        onDone: (Boolean, String) -> Unit,
+    ) = viewModelScope.launch {
+        runCatching {
+            val json = com.secondmemory.app.data.Backup.snapshot(things.value, settings.value)
+            val bytes = com.secondmemory.app.data.Backup.pack(context, json, password)
+            com.secondmemory.app.data.Backup.write(context, uri, bytes)
+        }.onSuccess { onDone(true, if (password.isNullOrBlank()) "Backup saved" else "Encrypted backup saved") }
+            .onFailure { onDone(false, it.message ?: "Couldn’t export") }
     }
 
-    fun importBackup(context: Context, uri: android.net.Uri, password: String?) = viewModelScope.launch {
-        val bytes = com.secondmemory.app.data.Backup.read(context, uri)
-        val (json, files) = com.secondmemory.app.data.Backup.unpack(bytes, password)
-        repo.importSnapshot(json, files)
-        ShadeSync.refresh(context, repo)
+    fun importBackup(
+        context: Context,
+        uri: android.net.Uri,
+        password: String?,
+        onDone: (Boolean, String) -> Unit,
+    ) = viewModelScope.launch {
+        runCatching {
+            val bytes = com.secondmemory.app.data.Backup.read(context, uri)
+            val (json, files) = com.secondmemory.app.data.Backup.unpack(bytes, password)
+            repo.importSnapshot(json, files)
+            ShadeSync.refresh(context, repo)
+        }.onSuccess { onDone(true, "Restored") }
+            .onFailure { onDone(false, if (it.message?.contains("pass", true) == true || it.message?.contains("Wrong") == true) "Wrong passphrase" else (it.message ?: "Couldn’t restore")) }
     }
 
     fun inbox(things: List<Thing>) = things.filter { it.status == ThingStatus.INBOX }

@@ -31,16 +31,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.secondmemory.app.domain.Appearance
-import com.secondmemory.app.domain.FREE_ACTIVE_LIMIT
 import com.secondmemory.app.domain.Settings
-import com.secondmemory.app.domain.Thing
-import com.secondmemory.app.domain.activeCount
 import com.secondmemory.app.notify.NotificationHelper
 
 @Composable
 fun SettingsScreen(
     settings: Settings,
-    things: List<Thing>,
     onPatch: ((Settings) -> Settings) -> Unit,
     onLoadExamples: () -> Unit,
     onReset: () -> Unit,
@@ -50,14 +46,21 @@ fun SettingsScreen(
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         onPatch { it.copy(notificationsEnabled = granted, notificationsAsked = true) }
     }
+    var advanced by remember { mutableStateOf(false) }
+    var encrypt by remember { mutableStateOf(false) }
     var password by remember { mutableStateOf("") }
     var confirmReset by remember { mutableStateOf(false) }
-    var pendingExport by remember { mutableStateOf(false) }
+    var pendingAction by remember { mutableStateOf<String?>(null) }
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
-        if (uri != null) onExport(uri, password.takeIf { it.isNotBlank() })
+        if (uri != null) onExport(uri, password.takeIf { encrypt && it.isNotBlank() })
+        encrypt = false
+        password = ""
+        pendingAction = null
     }
     val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) onImport(uri, password.takeIf { it.isNotBlank() })
+        password = ""
+        pendingAction = null
     }
     val context = LocalContext.current
     Column(
@@ -68,7 +71,7 @@ fun SettingsScreen(
     ) {
         Text("Settings", style = MaterialTheme.typography.headlineLarge)
         Text(
-            "Pinned items stay in your notification shade until you unpin them. Later is the only schedule.",
+            "Share it. It stays in the shade until you unpin it.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp, bottom = 20.dp),
@@ -96,75 +99,90 @@ fun SettingsScreen(
         SettingSwitch("Hide pin text on the lock screen", settings.lockScreenPrivate) {
             onPatch { s -> s.copy(lockScreenPrivate = it) }
         }
-        TextButton(onClick = { NotificationHelper.showWelcome(context) }) {
-            Text("Send a test pin")
-        }
-        SettingSwitch("Automatic titles", settings.automaticProcessing) {
-            onPatch { s -> s.copy(automaticProcessing = it) }
-        }
-
-        Label("Auto-expire pins")
-        Row {
-            listOf(0 to "Never", 24 to "1 day", 72 to "3 days", 168 to "1 week").forEach { (hours, label) ->
-                FilterChip(
-                    selected = settings.pinExpiryHours == hours,
-                    onClick = { onPatch { it.copy(pinExpiryHours = hours) } },
-                    label = { Text(label) },
-                    modifier = Modifier.padding(end = 8.dp),
-                )
-            }
-        }
-
-        SettingSwitch("Unlock unlimited pins", settings.isPro) {
-            onPatch { s -> s.copy(isPro = it) }
-        }
-
-        val active = activeCount(things)
-        Text(
-            if (settings.isPro) "Unlimited active things"
-            else "Free · $active / $FREE_ACTIVE_LIMIT active things",
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(top = 20.dp),
-        )
 
         Label("Backup")
-        Text(
-            "Export everything as a zip. Set a passphrase to encrypt it (AES-256). Same passphrase to restore.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-            label = { Text("Optional passphrase") },
-            singleLine = true,
-        )
-        TextButton(onClick = { exporter.launch("second-memory-backup.zip") }) {
+        TextButton(onClick = { pendingAction = "export"; exporter.launch("second-memory-backup.zip") }) {
             Text("Export backup")
         }
-        TextButton(onClick = { importer.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) }) {
+        TextButton(onClick = { pendingAction = "encrypt" }) {
+            Text("Encrypted backup")
+        }
+        TextButton(onClick = { pendingAction = "import"; importer.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) }) {
             Text("Restore backup")
         }
 
-        TextButton(onClick = onLoadExamples, modifier = Modifier.padding(top = 12.dp)) {
-            Text("Load example things")
+        TextButton(onClick = { advanced = !advanced }, modifier = Modifier.padding(top = 16.dp)) {
+            Text(if (advanced) "Hide advanced" else "Advanced")
         }
-        TextButton(onClick = { confirmReset = true }) {
-            Text("Reset this device")
+        if (advanced) {
+            SettingSwitch("Automatic titles", settings.automaticProcessing) {
+                onPatch { s -> s.copy(automaticProcessing = it) }
+            }
+            Label("Auto-expire pins")
+            Row {
+                listOf(0 to "Never", 24 to "1 day", 72 to "3 days", 168 to "1 week").forEach { (hours, label) ->
+                    FilterChip(
+                        selected = settings.pinExpiryHours == hours,
+                        onClick = { onPatch { it.copy(pinExpiryHours = hours) } },
+                        label = { Text(label) },
+                        modifier = Modifier.padding(end = 8.dp),
+                    )
+                }
+            }
+            TextButton(onClick = onLoadExamples) { Text("Load example things") }
+            TextButton(onClick = { NotificationHelper.showWelcome(context) }) { Text("Send a test pin") }
+            Text(
+                "Home screen: add the Pinned widget. Quick Settings: add the Pin clipboard tile.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            TextButton(onClick = { confirmReset = true }) { Text("Reset this device") }
         }
+
         Text(
-            "Share a link, photo, PDF, video, audio, contact or file from any app. Checklists in notes use [ ] lines. Add the pin widget or Quick Settings tile from the home screen.",
-            style = MaterialTheme.typography.bodyMedium,
+            "Second Memory",
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 8.dp, bottom = 32.dp),
+            modifier = Modifier.padding(top = 28.dp, bottom = 32.dp),
+        )
+    }
+    if (pendingAction == "encrypt") {
+        AlertDialog(
+            onDismissRequest = { pendingAction = null; password = ""; encrypt = false },
+            title = { Text("Encrypt backup") },
+            text = {
+                Column {
+                    Text("Choose a passphrase. You’ll need the same one to restore.")
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                        label = { Text("Passphrase") },
+                        singleLine = true,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        encrypt = true
+                        pendingAction = "export"
+                        exporter.launch("second-memory-backup.zip")
+                    },
+                    enabled = password.length >= 4,
+                ) { Text("Export") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingAction = null; password = "" }) { Text("Cancel") }
+            },
         )
     }
     if (confirmReset) {
         AlertDialog(
             onDismissRequest = { confirmReset = false },
             title = { Text("Reset this device?") },
-            text = { Text("Deletes every saved thing on this phone. This cannot be undone.") },
+            text = { Text("Deletes every saved thing on this phone.") },
             confirmButton = {
                 TextButton(onClick = { confirmReset = false; onReset() }) { Text("Delete everything") }
             },

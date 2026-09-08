@@ -53,9 +53,6 @@ class MemoryRepository(
                 return CaptureResult(thing = restored, duplicate = duplicate)
             }
         }
-        if (!settings.isPro && dao.activeCount() >= FREE_ACTIVE_LIMIT) {
-            return CaptureResult(blocked = true)
-        }
 
         val now = System.currentTimeMillis()
         val expiryHours = settings.pinExpiryHours
@@ -163,6 +160,10 @@ class MemoryRepository(
         }
     }
 
+    suspend fun mergeFavouritesIntoPins() {
+        currentThings().filter { it.isFavourite && !it.isPinned }.forEach { setPinned(it.id, true) }
+    }
+
     suspend fun failStaleProcessing() {
         dao.failStaleProcessing(System.currentTimeMillis() - 2 * 60_000L)
     }
@@ -257,7 +258,7 @@ class MemoryRepository(
 
     suspend fun togglePin(id: String): Thing? {
         val existing = dao.getThing(id)?.toDomain() ?: return null
-        val currently = existing.isPinned || existing.isFavourite
+        val currently = existing.isPinned
         return setPinned(id, !currently)
     }
 

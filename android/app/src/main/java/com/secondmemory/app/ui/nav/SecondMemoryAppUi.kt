@@ -12,10 +12,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Folder
-import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.List
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.Today
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -55,7 +54,6 @@ import com.secondmemory.app.ui.components.CaptureSheet
 import com.secondmemory.app.ui.screens.DetailScreen
 import com.secondmemory.app.ui.screens.LibraryScreen
 import com.secondmemory.app.ui.screens.OnboardingScreen
-import com.secondmemory.app.ui.screens.SearchScreen
 import com.secondmemory.app.ui.screens.SettingsScreen
 import com.secondmemory.app.ui.screens.TodayScreen
 import com.secondmemory.app.ui.theme.SecondMemoryTheme
@@ -65,6 +63,8 @@ import kotlinx.coroutines.launch
 fun SecondMemoryAppUi(
     vm: MemoryViewModel,
     initialThingId: String? = null,
+    openCapture: Boolean = false,
+    onCaptureConsumed: () -> Unit = {},
 ) {
     val settings by vm.settings.collectAsStateWithLifecycle()
     val settingsReady by vm.settingsReady.collectAsStateWithLifecycle()
@@ -98,11 +98,9 @@ fun SecondMemoryAppUi(
 
         fun pinToToday(id: String) {
             val thing = things.firstOrNull { it.id == id }
-            val turningOn = thing != null && !(thing.isPinned || thing.isFavourite)
+            val turningOn = thing != null && !thing.isPinned
             vm.togglePin(id)
-            if (turningOn) {
-                scope.launch { snackbar.showSnackbar("On Today") }
-            }
+            if (turningOn) scope.launch { snackbar.showSnackbar("Pinned") }
         }
 
         val permission = rememberLauncherForActivityResult(
@@ -140,6 +138,12 @@ fun SecondMemoryAppUi(
         LaunchedEffect(initialThingId) {
             if (!initialThingId.isNullOrBlank()) nav.navigate("thing/$initialThingId")
         }
+        LaunchedEffect(openCapture) {
+            if (openCapture) {
+                captureOpen = true
+                onCaptureConsumed()
+            }
+        }
 
         if (!settingsReady) {
             Box(
@@ -168,9 +172,6 @@ fun SecondMemoryAppUi(
                     androidx.compose.material3.TopAppBar(
                         title = { Text("Second Memory", style = MaterialTheme.typography.titleLarge) },
                         actions = {
-                            IconButton(onClick = { nav.navigate("search") }) {
-                                Icon(Icons.Outlined.Search, contentDescription = "Search")
-                            }
                             IconButton(onClick = { nav.navigate("settings") }) {
                                 Icon(Icons.Outlined.Settings, contentDescription = "Settings")
                             }
@@ -187,14 +188,14 @@ fun SecondMemoryAppUi(
                         NavigationBarItem(
                             selected = route == "today",
                             onClick = { nav.tab("today") },
-                            icon = { Icon(Icons.Outlined.Today, contentDescription = "Today") },
-                            label = { Text("Today") },
+                            icon = { Icon(Icons.Outlined.Notifications, contentDescription = "Pinned") },
+                            label = { Text("Pinned") },
                         )
                         NavigationBarItem(
                             selected = route == "library",
                             onClick = { nav.tab("library") },
-                            icon = { Icon(Icons.Outlined.Folder, contentDescription = "Library") },
-                            label = { Text("Library") },
+                            icon = { Icon(Icons.Outlined.List, contentDescription = "Saved") },
+                            label = { Text("Saved") },
                         )
                     }
                 }
@@ -221,9 +222,11 @@ fun SecondMemoryAppUi(
                         things = things,
                         settings = settings,
                         onOpen = { nav.navigate("thing/$it") },
-                        onDone = ::markDone,
                         onSnooze = vm::snooze,
-                        onArchive = vm::archive,
+                        onDelete = { id ->
+                            vm.remove(id)
+                            scope.launch { snackbar.showSnackbar("Deleted") }
+                        },
                         onPin = ::pinToToday,
                     )
                 }
@@ -232,32 +235,30 @@ fun SecondMemoryAppUi(
                         things = things,
                         settings = settings,
                         onOpen = { nav.navigate("thing/$it") },
-                        onDone = ::markDone,
                         onSnooze = vm::snooze,
-                        onArchive = vm::archive,
-                        onPin = ::pinToToday,
-                    )
-                }
-                composable("search") {
-                    SearchScreen(
-                        things = things,
-                        settings = settings,
-                        onOpen = { nav.navigate("thing/$it") },
-                        onDone = ::markDone,
-                        onSnooze = vm::snooze,
-                        onArchive = vm::archive,
+                        onDelete = { id ->
+                            vm.remove(id)
+                            scope.launch { snackbar.showSnackbar("Deleted") }
+                        },
                         onPin = ::pinToToday,
                     )
                 }
                 composable("settings") {
                     SettingsScreen(
                         settings = settings,
-                        things = things,
                         onPatch = vm::patchSettings,
                         onLoadExamples = vm::loadExamples,
                         onReset = vm::resetAll,
-                        onExport = { uri, pw -> vm.exportBackup(context, uri, pw) },
-                        onImport = { uri, pw -> vm.importBackup(context, uri, pw) },
+                        onExport = { uri, pw ->
+                            vm.exportBackup(context, uri, pw) { ok, msg ->
+                                scope.launch { snackbar.showSnackbar(msg) }
+                            }
+                        },
+                        onImport = { uri, pw ->
+                            vm.importBackup(context, uri, pw) { ok, msg ->
+                                scope.launch { snackbar.showSnackbar(msg) }
+                            }
+                        },
                     )
                 }
                 composable(
@@ -271,18 +272,13 @@ fun SecondMemoryAppUi(
                         settings = settings,
                         onBack = { nav.popBackStack() },
                         onOpen = { id?.let(vm::openThing) },
-                        onDone = { id?.let(::markDone); nav.popBackStack() },
                         onSnooze = { until -> id?.let { vm.snooze(it, until) } },
-                        onArchive = { id?.let(vm::archive); nav.popBackStack() },
-                        onRestore = { id?.let(vm::restore) },
                         onDelete = { id?.let(vm::remove); nav.popBackStack() },
                         onPin = { id?.let(::pinToToday) },
                         onNotes = { notes -> id?.let { vm.updateNotes(it, notes) } },
                         onTitle = { title -> id?.let { vm.updateTitle(it, title) } },
-                        onCategory = { cat -> id?.let { vm.updateCategory(it, cat) } },
                         onChecklist = { raw -> id?.let { vm.setChecklist(it, raw) } },
                         onColor = { color -> id?.let { vm.setPinColor(it, color) } },
-                        onPriority = { p -> id?.let { vm.setPriority(it, p) } },
                         onExpires = { at -> id?.let { vm.setExpiresAt(it, at) } },
                     )
                 }
@@ -296,7 +292,6 @@ fun SecondMemoryAppUi(
                     vm.capture(input) { result ->
                         scope.launch {
                             val msg = when {
-                                result.blocked -> "Free limit reached"
                                 result.duplicate != null -> "Already saved"
                                 else -> "Saved"
                             }

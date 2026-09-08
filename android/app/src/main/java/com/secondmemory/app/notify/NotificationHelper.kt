@@ -41,7 +41,7 @@ object NotificationHelper {
     private const val PIN_LIMIT = 20
     private const val REPOST_WINDOW_MS = 20_000L
 
-    fun isPinned(thing: Thing): Boolean = thing.isPinned || thing.isFavourite
+    fun isPinned(thing: Thing): Boolean = thing.isPinned
 
     fun pinId(thing: Thing): Int =
         if (thing.notifId > 0) thing.notifId else 10_000 + (thing.id.hashCode() and 0x7fffffff) % 80_000

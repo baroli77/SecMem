@@ -32,6 +32,7 @@ class SecondMemoryApp : Application() {
         container = AppContainer(this)
         ResurfaceWorker.schedule(this)
         container.scope.launch {
+            container.repository.mergeFavouritesIntoPins()
             container.repository.failStaleProcessing()
             container.repository.assignMissingNotifIds()
             container.repository.pruneCaptureFiles()

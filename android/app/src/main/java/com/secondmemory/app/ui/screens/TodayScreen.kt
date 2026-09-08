@@ -16,7 +16,6 @@ import androidx.compose.ui.unit.dp
 import com.secondmemory.app.domain.Resurface
 import com.secondmemory.app.domain.Settings
 import com.secondmemory.app.domain.Thing
-import com.secondmemory.app.domain.ThingStatus
 import com.secondmemory.app.ui.components.ThingCard
 
 @Composable
@@ -24,15 +23,12 @@ fun TodayScreen(
     things: List<Thing>,
     settings: Settings,
     onOpen: (String) -> Unit,
-    onDone: (String) -> Unit,
     onSnooze: (String, Long) -> Unit,
-    onArchive: (String) -> Unit,
+    onDelete: (String) -> Unit,
     onPin: (String) -> Unit,
 ) {
     val pinned = remember(things) {
-        things.filter {
-            (it.isPinned || it.isFavourite) && it.status != ThingStatus.COMPLETED && it.status != ThingStatus.ARCHIVED
-        }.sortedByDescending { it.updatedAt }
+        things.filter { it.isPinned }.sortedBy { it.sortOrder }
     }
     val snooze = remember(settings) { Resurface.snoozeOptions(settings = settings) }
 
@@ -51,24 +47,16 @@ fun TodayScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp),
                 )
-                Text(
-                    "Swipe right to mark done. Swipe left to unpin.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
             }
         }
         items(pinned, key = { it.id }) { thing ->
             ThingCard(
                 thing = thing,
                 onOpen = { onOpen(thing.id) },
-                onDone = { onDone(thing.id) },
                 onSnooze = { onSnooze(thing.id, it) },
-                onArchive = { onArchive(thing.id) },
+                onDelete = { onDelete(thing.id) },
                 onPin = { onPin(thing.id) },
                 snoozeOptions = snooze,
-                showResurface = false,
             )
         }
     }
