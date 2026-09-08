@@ -29,10 +29,16 @@ object NotificationHelper {
     const val ACTION_PIN = "com.secondmemory.app.PIN"
     const val EXTRA_THING_ID = "thingId"
     private const val GROUP = "pinned"
-    private const val SUMMARY_ID = 1001
-    private val posted = mutableSetOf<Int>()
+    private const val SUMMARY_ID = 1
+    private const val WELCOME_ID = 2
+    private const val PIN_LIMIT = 12
 
     fun isPinned(thing: Thing): Boolean = thing.isPinned || thing.isFavourite
+
+    fun pinId(thing: Thing): Int =
+        if (thing.notifId > 0) thing.notifId else 10_000 + (thing.id.hashCode() and 0x7fffffff) % 80_000
+
+    private fun requestCode(thing: Thing, offset: Int): Int = pinId(thing) * 10 + offset
 
     fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -62,29 +68,32 @@ object NotificationHelper {
         }
         val pins = things.filter {
             isPinned(it) && it.status != ThingStatus.COMPLETED && it.status != ThingStatus.ARCHIVED
-        }
-        val wanted = pins.map { it.id.hashCode() }.toSet()
-        posted.filter { it !in wanted }.forEach { nm.cancel(it) }
-        pins.forEach { showPin(context, it) }
-        posted.clear()
-        posted.addAll(wanted)
+        }.sortedByDescending { it.updatedAt }
+        val visible = pins.take(PIN_LIMIT)
+        val wanted = visible.map { pinId(it) }.toSet() + setOf(SUMMARY_ID)
+        activeIds(context).filter { it !in wanted && it != WELCOME_ID }.forEach { nm.cancel(it) }
+        visible.forEachIndexed { index, thing -> showPin(context, thing, withThumb = index < 3) }
         if (pins.isEmpty()) nm.cancel(SUMMARY_ID) else showSummary(context, pins)
     }
 
     fun clear(context: Context) {
         val nm = NotificationManagerCompat.from(context)
-        posted.forEach { nm.cancel(it) }
-        posted.clear()
+        activeIds(context).forEach { nm.cancel(it) }
         nm.cancel(SUMMARY_ID)
-        nm.cancel(1)
+        nm.cancel(WELCOME_ID)
+    }
+
+    private fun activeIds(context: Context): List<Int> {
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return emptyList()
+        return manager.activeNotifications.map { it.id }
     }
 
     fun showJustSaved(context: Context, thing: Thing) {
         if (isPinned(thing)) return
         ensureChannel(context)
         val openPi = openPending(context, thing)
-        val pinPi = actionPi(context, ACTION_PIN, thing.id, thing.id.hashCode() + 11)
-        val donePi = actionPi(context, ACTION_DONE, thing.id, thing.id.hashCode() + 12)
+        val pinPi = actionPi(context, ACTION_PIN, thing.id, requestCode(thing, 1))
+        val donePi = actionPi(context, ACTION_DONE, thing.id, requestCode(thing, 2))
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_memory)
             .setContentTitle("Saved")
@@ -101,7 +110,7 @@ object NotificationHelper {
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .build()
         try {
-            NotificationManagerCompat.from(context).notify(thing.id.hashCode() + 50_000, notification)
+            NotificationManagerCompat.from(context).notify(pinId(thing) + 1_000_000, notification)
         } catch (_: SecurityException) {
         }
     }
@@ -128,7 +137,7 @@ object NotificationHelper {
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .build()
         try {
-            NotificationManagerCompat.from(context).notify(1, notification)
+            NotificationManagerCompat.from(context).notify(WELCOME_ID, notification)
         } catch (_: SecurityException) {
         }
     }
@@ -148,7 +157,7 @@ object NotificationHelper {
     fun viewIntent(context: Context, thing: Thing): Intent {
         val file = thing.imageUri?.let { File(it) }?.takeIf { it.exists() }
         val url = thing.sourceUrl?.trim().orEmpty()
-        if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("geo:")) {
+        if (url.startsWith("https://") || url.startsWith("geo:")) {
             return Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
@@ -174,10 +183,10 @@ object NotificationHelper {
         }
     }
 
-    private fun showPin(context: Context, thing: Thing) {
+    private fun showPin(context: Context, thing: Thing, withThumb: Boolean) {
         val openPi = openPending(context, thing)
-        val donePi = actionPi(context, ACTION_DONE, thing.id, thing.id.hashCode() + 1)
-        val laterPi = actionPi(context, ACTION_LATER, thing.id, thing.id.hashCode() + 2)
+        val donePi = actionPi(context, ACTION_DONE, thing.id, requestCode(thing, 3))
+        val laterPi = actionPi(context, ACTION_LATER, thing.id, requestCode(thing, 4))
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_memory)
             .setContentTitle(thing.title)
@@ -197,9 +206,9 @@ object NotificationHelper {
             .setColor(0xFF2C5C4F.toInt())
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-        thumb(thing)?.let { builder.setLargeIcon(it) }
+        if (withThumb) thumb(thing)?.let { builder.setLargeIcon(it) }
         try {
-            NotificationManagerCompat.from(context).notify(thing.id.hashCode(), builder.build())
+            NotificationManagerCompat.from(context).notify(pinId(thing), builder.build())
         } catch (_: SecurityException) {
         }
     }
@@ -241,7 +250,7 @@ object NotificationHelper {
         val isApp = view.component?.className?.contains("MainActivity") == true
         return PendingIntent.getActivity(
             context,
-            thing.id.hashCode() + if (isApp) 0 else 7,
+            requestCode(thing, if (isApp) 5 else 6),
             view,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )

@@ -9,8 +9,6 @@ import android.os.Build
 import com.secondmemory.app.SecondMemoryApp
 import com.secondmemory.app.domain.Thing
 import com.secondmemory.app.domain.ThingStatus
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 object ReminderScheduler {
@@ -53,9 +51,9 @@ object ReminderScheduler {
 class ReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val pending = goAsync()
-        CoroutineScope(Dispatchers.IO).launch {
+        val app = context.applicationContext as SecondMemoryApp
+        app.container.scope.launch {
             try {
-                val app = context.applicationContext as SecondMemoryApp
                 val repo = app.container.repository
                 val due = repo.tickAndCollectDue()
                 due.forEach { repo.setPinned(it.id, true) }
@@ -76,9 +74,9 @@ class BootReceiver : BroadcastReceiver() {
         ) return
         ResurfaceWorker.schedule(context)
         val pending = goAsync()
-        CoroutineScope(Dispatchers.IO).launch {
+        val app = context.applicationContext as SecondMemoryApp
+        app.container.scope.launch {
             try {
-                val app = context.applicationContext as SecondMemoryApp
                 val things = app.container.repository.currentThings()
                 NotificationHelper.refreshPins(context, things)
                 ReminderScheduler.scheduleNext(context, things)

@@ -13,17 +13,22 @@ import com.secondmemory.app.domain.Seed
 import com.secondmemory.app.domain.Settings
 import com.secondmemory.app.domain.Thing
 import com.secondmemory.app.domain.ThingStatus
-import com.secondmemory.app.domain.activeCount
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.io.File
 import java.util.Calendar
 import java.util.UUID
 
 class MemoryRepository(
     private val dao: ThingDao,
     private val settingsStore: SettingsStore,
+    private val capturesDir: File,
 ) {
+    private val write = Mutex()
+
     val things: Flow<List<Thing>> = dao.observeThings().map { list -> list.map { it.toDomain() } }
     val activities: Flow<List<ActivityEvent>> = dao.observeActivities().map { list -> list.map { it.toDomain() } }
     val settings: Flow<Settings> = settingsStore.settings
@@ -33,11 +38,14 @@ class MemoryRepository(
     suspend fun currentSettings(): Settings = settings.first()
     suspend fun currentThings(): List<Thing> = dao.getThings().map { it.toDomain() }
 
-    suspend fun capture(input: CaptureInput): CaptureResult {
+    suspend fun capture(input: CaptureInput): CaptureResult = write.withLock {
         val settings = currentSettings()
         val parsed = Heuristics.parseCaptureInput(input)
         if (!input.forceDuplicate) {
-            val duplicate = Heuristics.findDuplicate(currentThings(), parsed.sourceUrl)
+            val duplicate = Heuristics.findDuplicate(
+                dao.thingsWithUrl().map { it.toDomain() },
+                parsed.sourceUrl,
+            )
             if (duplicate != null) {
                 val pinned = if (duplicate.isPinned) duplicate else {
                     duplicate.copy(isPinned = true, status = ThingStatus.ACTIVE, updatedAt = System.currentTimeMillis())
@@ -46,13 +54,12 @@ class MemoryRepository(
                 return CaptureResult(thing = pinned, duplicate = duplicate)
             }
         }
-        if (!settings.isPro && activeCount(currentThings()) >= FREE_ACTIVE_LIMIT) {
-            val first = currentThings().firstOrNull() ?: placeholderBlocked()
-            return CaptureResult(thing = first, blocked = true)
+        if (!settings.isPro && dao.activeCount() >= FREE_ACTIVE_LIMIT) {
+            return CaptureResult(blocked = true)
         }
 
         val now = System.currentTimeMillis()
-        var draft = Thing(
+        val draft = Thing(
             id = Seed.nid(),
             createdAt = now,
             updatedAt = now,
@@ -74,6 +81,7 @@ class MemoryRepository(
             detectedTime = parsed.detectedTime,
             detectedPerson = parsed.detectedPerson,
             processingStatus = if (settings.automaticProcessing) ProcessingStatus.QUEUED else ProcessingStatus.NONE,
+            notifId = dao.maxNotifId() + 1,
         )
         dao.upsert(draft.toEntity())
         log("captured", draft)
@@ -83,51 +91,87 @@ class MemoryRepository(
     suspend fun enrich(id: String) {
         val existing = dao.getThing(id)?.toDomain() ?: return
         val settings = currentSettings()
-        dao.upsert(
-            existing.copy(
-                processingStatus = ProcessingStatus.PROCESSING,
-                updatedAt = System.currentTimeMillis(),
-            ).toEntity(),
-        )
-        var next = existing
+        if (!settings.automaticProcessing || !settings.aiEnabled) return
+        write.withLock {
+            val latest = dao.getThing(id)?.toDomain() ?: return@withLock
+            dao.upsert(
+                latest.copy(
+                    processingStatus = ProcessingStatus.PROCESSING,
+                    updatedAt = System.currentTimeMillis(),
+                ).toEntity(),
+            )
+        }
         try {
+            var title = existing.title
+            var summary = existing.summary
+            var siteName = existing.siteName
+            var sourceUrl = existing.sourceUrl
+            var category = existing.category
+            var tags = existing.tags
             val url = existing.sourceUrl
             if (!url.isNullOrBlank()) {
                 val meta = MetadataFetcher.fetch(url)
                 if (meta != null) {
-                    next = next.copy(
-                        title = meta.title?.takeIf { it.length >= 3 } ?: next.title,
-                        summary = meta.description ?: next.summary,
-                        siteName = meta.siteName ?: next.siteName,
-                        sourceUrl = meta.canonicalUrl ?: next.sourceUrl,
-                    )
-                    if (next.category == Category.UNKNOWN || next.category == Category.READ) {
-                        val reclass = Heuristics.extractSignals(next.originalContent, next.sourceUrl)
+                    title = meta.title?.takeIf { it.length >= 3 } ?: title
+                    summary = meta.description ?: summary
+                    siteName = meta.siteName ?: siteName
+                    sourceUrl = meta.canonicalUrl ?: sourceUrl
+                    if (category == Category.UNKNOWN || category == Category.READ) {
+                        val reclass = Heuristics.extractSignals(existing.originalContent, sourceUrl)
                         if (reclass.category != Category.UNKNOWN) {
-                            next = next.copy(category = reclass.category, tags = (next.tags + reclass.tags).distinct())
+                            category = reclass.category
+                            tags = (tags + reclass.tags).distinct()
                         }
                     }
                 }
             }
-            next = next.copy(
-                aiProcessed = true,
-                aiProvider = "heuristic",
-                aiConfidence = 0.7f,
-                processingStatus = ProcessingStatus.COMPLETE,
-                updatedAt = System.currentTimeMillis(),
-            )
-            dao.upsert(next.toEntity())
-            log("processed", next)
-        } catch (e: Exception) {
-            dao.upsert(
-                existing.copy(
-                    processingStatus = ProcessingStatus.FAILED,
-                    processingError = e.message,
+            write.withLock {
+                val latest = dao.getThing(id)?.toDomain() ?: return@withLock
+                val next = latest.copy(
+                    title = title,
+                    summary = summary,
+                    siteName = siteName,
+                    sourceUrl = sourceUrl,
+                    category = category,
+                    tags = tags,
+                    aiProcessed = true,
+                    aiProvider = "heuristic",
+                    aiConfidence = 0.7f,
+                    processingStatus = ProcessingStatus.COMPLETE,
                     updatedAt = System.currentTimeMillis(),
-                ).toEntity(),
-            )
-            log("processing_failed", existing, e.message)
+                )
+                dao.upsert(next.toEntity())
+                log("processed", next)
+            }
+        } catch (e: Exception) {
+            write.withLock {
+                val latest = dao.getThing(id)?.toDomain() ?: return@withLock
+                dao.upsert(
+                    latest.copy(
+                        processingStatus = ProcessingStatus.FAILED,
+                        processingError = e.message,
+                        updatedAt = System.currentTimeMillis(),
+                    ).toEntity(),
+                )
+                log("processing_failed", latest, e.message)
+            }
         }
+    }
+
+    suspend fun failStaleProcessing() {
+        dao.failStaleProcessing(System.currentTimeMillis() - 2 * 60_000L)
+    }
+
+    suspend fun assignMissingNotifIds() = write.withLock {
+        var next = dao.maxNotifId()
+        dao.missingNotifIds().forEach { row ->
+            next += 1
+            dao.upsert(row.copy(notifId = next))
+        }
+    }
+
+    suspend fun pruneCaptureFiles() {
+        CaptureFiles.pruneOrphans(capturesDir, dao.allImageUris().toSet())
     }
 
     suspend fun complete(id: String) = patch(id) {
@@ -188,8 +232,12 @@ class MemoryRepository(
     suspend fun keep(id: String) = setPinned(id, true)
 
     suspend fun remove(id: String) {
-        val existing = dao.getThing(id)?.toDomain()
-        dao.delete(id)
+        val existing = write.withLock {
+            val row = dao.getThing(id)?.toDomain()
+            dao.delete(id)
+            row
+        }
+        CaptureFiles.delete(existing?.imageUri)
         if (existing != null) log("deleted", existing)
     }
 
@@ -198,6 +246,7 @@ class MemoryRepository(
         val currently = existing.isPinned || existing.isFavourite
         return setPinned(id, !currently)
     }
+
     suspend fun toggleFavourite(id: String) = patch(id) { it.copy(isFavourite = !it.isFavourite) }.also {
         if (it?.isFavourite == true) log("favourited", it)
     }
@@ -247,26 +296,31 @@ class MemoryRepository(
 
     suspend fun completeOnboarding(loadExamples: Boolean = true) {
         settingsStore.update { it.copy(onboardingComplete = true) }
-        if (loadExamples && currentThings().isEmpty()) {
+        if (loadExamples && dao.getThings().isEmpty()) {
             dao.upsertAll(Seed.examples().map { it.toEntity() })
+            assignMissingNotifIds()
         }
     }
 
     suspend fun loadExamples() {
         dao.upsertAll(Seed.examples().map { it.toEntity() })
+        assignMissingNotifIds()
     }
 
     suspend fun resetAll() {
-        dao.deleteAll()
-        dao.deleteActivities()
+        write.withLock {
+            dao.deleteAll()
+            dao.deleteActivities()
+        }
+        CaptureFiles.deleteAll(capturesDir)
         settingsStore.update { Settings() }
     }
 
-    private suspend fun patch(id: String, transform: suspend (Thing) -> Thing): Thing? {
-        val existing = dao.getThing(id)?.toDomain() ?: return null
+    private suspend fun patch(id: String, transform: suspend (Thing) -> Thing): Thing? = write.withLock {
+        val existing = dao.getThing(id)?.toDomain() ?: return@withLock null
         val next = transform(existing).copy(updatedAt = System.currentTimeMillis())
         dao.upsert(next.toEntity())
-        return next
+        next
     }
 
     private suspend fun log(type: String, thing: Thing?, detail: String? = null) {
@@ -282,13 +336,4 @@ class MemoryRepository(
             ).toEntity(),
         )
     }
-
-    private fun placeholderBlocked(): Thing = Thing(
-        id = "blocked",
-        createdAt = 0,
-        updatedAt = 0,
-        originalContent = "",
-        contentType = com.secondmemory.app.domain.ContentType.TEXT,
-        title = "Limit reached",
-    )
 }

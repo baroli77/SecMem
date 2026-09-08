@@ -10,7 +10,18 @@ import com.secondmemory.app.domain.ProcessingStatus
 import com.secondmemory.app.domain.Thing
 import com.secondmemory.app.domain.ThingStatus
 
-@Entity(tableName = "things")
+import androidx.room.Index
+
+@Entity(
+    tableName = "things",
+    indices = [
+        Index("status"),
+        Index("createdAt"),
+        Index("resurfaceAt"),
+        Index("sourceUrl"),
+        Index("notifId"),
+    ],
+)
 data class ThingEntity(
     @PrimaryKey val id: String,
     val createdAt: Long,
@@ -52,6 +63,7 @@ data class ThingEntity(
     val reasonForResurface: String?,
     val ocrText: String?,
     val siteName: String?,
+    val notifId: Int = 0,
 )
 
 @Entity(tableName = "activities")
@@ -105,6 +117,7 @@ fun ThingEntity.toDomain(): Thing = Thing(
     reasonForResurface = reasonForResurface,
     ocrText = ocrText,
     siteName = siteName,
+    notifId = notifId,
 )
 
 fun Thing.toEntity(): ThingEntity = ThingEntity(
@@ -148,6 +161,7 @@ fun Thing.toEntity(): ThingEntity = ThingEntity(
     reasonForResurface = reasonForResurface,
     ocrText = ocrText,
     siteName = siteName,
+    notifId = notifId,
 )
 
 fun ActivityEntity.toDomain(): ActivityEvent =

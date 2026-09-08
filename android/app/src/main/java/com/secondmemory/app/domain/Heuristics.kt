@@ -307,7 +307,7 @@ object Heuristics {
             }
             Regex("""\bthis weekend\b""").containsMatchIn(text) -> {
                 foundDate = true
-                date = nextWeekday(nowCal, Calendar.SATURDAY)
+                date = nextWeekend(nowCal)
             }
             Regex("""\bnext week\b""").containsMatchIn(text) -> {
                 foundDate = true
@@ -318,10 +318,7 @@ object Heuristics {
                     val name = WEEKDAYS[i]
                     if (Regex("""\b(next\s+)?$name\b""").containsMatchIn(text)) {
                         foundDate = true
-                        date = nextWeekday(nowCal, i)
-                        if (Regex("""next\s+""").containsMatchIn(text) && date.get(Calendar.DAY_OF_WEEK) - 1 == nowCal.get(Calendar.DAY_OF_WEEK) - 1) {
-                            date = addDays(date, 7)
-                        }
+                        date = nextWeekday(nowCal, i, allowToday = false)
                         break
                     }
                 }
@@ -385,10 +382,18 @@ object Heuristics {
         }
 
         val isoDate = "${date.get(Calendar.YEAR)}-${pad(date.get(Calendar.MONTH) + 1)}-${pad(date.get(Calendar.DAY_OF_MONTH))}"
+        var dueAt = if (foundDate || time != null) date.timeInMillis else null
+        if (dueAt != null && dueAt < now - 30_000L) {
+            val todayish = Regex("""\b(today|tonight)\b""").containsMatchIn(text)
+            if (!foundDate || todayish) {
+                date.add(Calendar.DAY_OF_YEAR, 1)
+                dueAt = date.timeInMillis
+            }
+        }
         return DateTimeHit(
-            isoDate = if (foundDate) isoDate else null,
+            isoDate = if (foundDate) "${date.get(Calendar.YEAR)}-${pad(date.get(Calendar.MONTH) + 1)}-${pad(date.get(Calendar.DAY_OF_MONTH))}" else null,
             time = time,
-            dueAt = if (foundDate || time != null) date.timeInMillis else null,
+            dueAt = dueAt,
         )
     }
 
@@ -434,11 +439,18 @@ object Heuristics {
     private fun addDays(from: Calendar, n: Int): Calendar =
         (from.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, n) }
 
-    private fun nextWeekday(from: Calendar, weekday: Int): Calendar {
+    private fun nextWeekend(from: Calendar): Calendar {
+        val dow = from.get(Calendar.DAY_OF_WEEK)
+        if (dow == Calendar.SATURDAY || dow == Calendar.SUNDAY) return from.clone() as Calendar
+        return nextWeekday(from, 6, allowToday = true)
+    }
+
+    private fun nextWeekday(from: Calendar, jsWeekday: Int, allowToday: Boolean = false): Calendar {
+        val target = jsWeekday + 1
         val d = from.clone() as Calendar
-        val fromDow = d.get(Calendar.DAY_OF_WEEK) - 1 // 0 = Sunday, matching JS Date.getDay()
-        val diff = (weekday - fromDow + 7) % 7
-        d.add(Calendar.DAY_OF_YEAR, if (diff == 0) 7 else diff)
+        var diff = (target - d.get(Calendar.DAY_OF_WEEK) + 7) % 7
+        if (diff == 0 && !allowToday) diff = 7
+        d.add(Calendar.DAY_OF_YEAR, diff)
         return d
     }
 

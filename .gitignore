@@ -1,3 +1,23 @@
+# web / sandbox (Android-only repo)
+/src/
+/scripts/
+/server/
+/migrations/
+/package.json
+/package-lock.json
+/vite.config.ts
+/tsconfig.json
+/eslint.config.mjs
+/startup.sh
+/public/
+/AGENTS.md
+/AGENTS.project.md
+/.prettierrc
+/.node_modules.lock
+/screenshots/
+/attachments/
+/artifacts/
+
 # dependencies
 node_modules/
 
@@ -7,6 +27,7 @@ node_modules/
 .env
 .env.*
 local.properties
+keystore.properties
 
 # android sdk, gradle, build output
 .android-sdk/
@@ -23,15 +44,12 @@ android/local.properties
 *.keystore
 *.jks
 
-# generated / sandbox
-artifacts/
+# generated
 dist/
 .output/
 .tanstack/
 .vercel/
 .grok/
-screenshots/
-attachments/
 
 # logs and caches
 *.log

@@ -55,6 +55,7 @@ data class Thing(
     val reasonForResurface: String? = null,
     val ocrText: String? = null,
     val siteName: String? = null,
+    val notifId: Int = 0,
 )
 
 data class ActivityEvent(
@@ -98,10 +99,12 @@ data class CaptureInput(
 )
 
 data class CaptureResult(
-    val thing: Thing,
+    val thing: Thing? = null,
     val duplicate: Thing? = null,
     val blocked: Boolean = false,
-)
+) {
+    val saved: Thing? get() = if (blocked) null else thing
+}
 
 data class ParsedCapture(
     val originalContent: String,

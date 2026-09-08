@@ -50,12 +50,34 @@ class HeuristicsTest {
 
     @Test
     fun tomorrowResolves() {
-        val now = Calendar.getInstance(TimeZone.getDefault()).apply {
+        val tz = TimeZone.getTimeZone("UTC")
+        val now = Calendar.getInstance(tz).apply {
             set(2026, Calendar.SEPTEMBER, 6, 10, 0, 0)
             set(Calendar.MILLISECOND, 0)
         }
         val r = Heuristics.extractDateTime("call them tomorrow", now.timeInMillis)
         assertEquals("2026-09-07", r.isoDate)
+    }
+
+    @Test
+    fun thisWeekendOnSaturdayStaysToday() {
+        val now = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+            set(2026, Calendar.SEPTEMBER, 5, 10, 0, 0) // Saturday
+            set(Calendar.MILLISECOND, 0)
+        }
+        val r = Heuristics.extractDateTime("do this weekend", now.timeInMillis)
+        assertEquals("2026-09-05", r.isoDate)
+    }
+
+    @Test
+    fun pastTimeRollsForward() {
+        val now = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+            set(2026, Calendar.SEPTEMBER, 8, 15, 0, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val r = Heuristics.extractDateTime("call at 9am", now.timeInMillis)
+        assertNotNull(r.dueAt)
+        assertTrue(r.dueAt!! > now.timeInMillis)
     }
 
     @Test

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -13,18 +15,26 @@ android {
         applicationId = "com.secondmemory.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 7
-        versionName = "1.1.2"
+        versionCode = 8
+        versionName = "1.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
     }
 
     signingConfigs {
         create("release") {
-            storeFile = rootProject.file("release.keystore")
-            storePassword = "secondmemory"
-            keyAlias = "secondmemory"
-            keyPassword = "secondmemory"
+            val propsFile = rootProject.file("keystore.properties")
+            val props = Properties()
+            if (propsFile.exists()) propsFile.inputStream().use { props.load(it) }
+            val store = props.getProperty("storeFile") ?: "release.keystore"
+            storeFile = rootProject.file(store)
+            storePassword = props.getProperty("storePassword")
+                ?: System.getenv("SECOND_MEMORY_STORE_PASSWORD")
+                ?: ""
+            keyAlias = props.getProperty("keyAlias") ?: "secondmemory"
+            keyPassword = props.getProperty("keyPassword")
+                ?: System.getenv("SECOND_MEMORY_KEY_PASSWORD")
+                ?: ""
         }
     }
 
@@ -34,8 +44,8 @@ android {
             versionNameSuffix = "-debug"
         }
         release {
-            isMinifyEnabled = false
-            isShrinkResources = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -62,6 +72,10 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {

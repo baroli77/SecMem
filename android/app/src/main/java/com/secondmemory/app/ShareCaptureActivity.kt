@@ -41,7 +41,10 @@ class ShareCaptureActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (savedInstanceState != null) return
+        if (savedInstanceState != null) {
+            finish()
+            return
+        }
         lifecycleScope.launch { runCapture() }
     }
 
@@ -51,16 +54,17 @@ class ShareCaptureActivity : ComponentActivity() {
         var lastMessage = getString(R.string.saved_toast)
         inputs.forEach { input ->
             val result = app.container.repository.capture(input)
-            if (!result.blocked && result.duplicate == null) {
-                withContext(Dispatchers.IO) { app.container.repository.enrich(result.thing.id) }
+            val saved = result.saved
+            if (saved != null && result.duplicate == null) {
+                withContext(Dispatchers.IO) { app.container.repository.enrich(saved.id) }
             }
             lastMessage = when {
                 result.blocked -> "Free limit reached — upgrade in Settings"
                 result.duplicate != null -> "Already saved: ${result.duplicate.title}"
                 else -> getString(R.string.saved_toast)
             }
-            if (!result.blocked) {
-                NotificationHelper.showJustSaved(this, result.thing)
+            if (saved != null) {
+                NotificationHelper.showJustSaved(this, saved)
             }
         }
         pendingMessage = lastMessage
@@ -138,6 +142,10 @@ class ShareCaptureActivity : ComponentActivity() {
     }
 
     private fun friendlySource(): String {
+        @Suppress("DEPRECATION")
+        val extra = intent.getParcelableExtra(Intent.EXTRA_REFERRER) as? Uri
+        val fromReferrer = referrer?.host ?: extra?.host
+        if (!fromReferrer.isNullOrBlank()) return fromReferrer
         val pkg = callingPackage ?: return "Share"
         return try {
             val info = packageManager.getApplicationInfo(pkg, 0)
@@ -159,7 +167,9 @@ class ShareCaptureActivity : ComponentActivity() {
 
     private fun persistSharedFile(uri: Uri, mime: String?, name: String?): String? {
         return try {
-            val dir = File(filesDir, "captures").apply { mkdirs() }
+            val size = querySize(uri)
+            if (size != null && size > com.secondmemory.app.data.CaptureFiles.MAX_BYTES) return null
+            val dir = com.secondmemory.app.data.CaptureFiles.dir(this)
             val ext = name?.substringAfterLast('.', "")?.takeIf { it.length in 1..8 }
                 ?: MimeTypeMap.getSingleton().getExtensionFromMimeType(mime)
                 ?: when {
@@ -170,10 +180,33 @@ class ShareCaptureActivity : ComponentActivity() {
                     else -> "bin"
                 }
             val dest = File(dir, "${UUID.randomUUID()}.$ext")
+            var copied = 0L
             contentResolver.openInputStream(uri)?.use { input ->
-                dest.outputStream().use { output -> input.copyTo(output) }
+                dest.outputStream().use { output ->
+                    val buf = ByteArray(16 * 1024)
+                    while (true) {
+                        val n = input.read(buf)
+                        if (n <= 0) break
+                        copied += n
+                        if (copied > com.secondmemory.app.data.CaptureFiles.MAX_BYTES) {
+                            dest.delete()
+                            return null
+                        }
+                        output.write(buf, 0, n)
+                    }
+                }
             } ?: return null
             dest.absolutePath
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun querySize(uri: Uri): Long? {
+        return try {
+            contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getLong(0).takeIf { it > 0 } else null
+            }
         } catch (_: Exception) {
             null
         }

@@ -68,15 +68,17 @@ fun LibraryScreen(
 ) {
     var filter by remember { mutableStateOf<Category?>(null) }
     var status by remember { mutableStateOf("open") }
-    val snooze = Resurface.snoozeOptions(settings = settings)
-    val filtered = things.filter { t ->
-        val statusOk = when (status) {
-            "open" -> t.status == ThingStatus.INBOX || t.status == ThingStatus.ACTIVE
-            "done" -> t.status == ThingStatus.COMPLETED
-            "archived" -> t.status == ThingStatus.ARCHIVED
-            else -> true
+    val snooze = remember(settings) { Resurface.snoozeOptions(settings = settings) }
+    val filtered = remember(things, status, filter) {
+        things.filter { t ->
+            val statusOk = when (status) {
+                "open" -> t.status == ThingStatus.INBOX || t.status == ThingStatus.ACTIVE
+                "done" -> t.status == ThingStatus.COMPLETED
+                "archived" -> t.status == ThingStatus.ARCHIVED
+                else -> true
+            }
+            statusOk && (filter == null || t.category == filter)
         }
-        statusOk && (filter == null || t.category == filter)
     }
     Column(Modifier.fillMaxSize()) {
         Text("Library", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
@@ -124,13 +126,15 @@ fun SearchScreen(
     onPin: (String) -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
-    val snooze = Resurface.snoozeOptions(settings = settings)
+    val snooze = remember(settings) { Resurface.snoozeOptions(settings = settings) }
     val q = query.trim().lowercase()
-    val results = if (q.isEmpty()) emptyList() else things.filter {
-        it.title.lowercase().contains(q) ||
-            it.originalContent.lowercase().contains(q) ||
-            (it.summary?.lowercase()?.contains(q) == true) ||
-            it.tags.any { tag -> tag.lowercase().contains(q) }
+    val results = remember(things, q) {
+        if (q.isEmpty()) emptyList() else things.filter {
+            it.title.lowercase().contains(q) ||
+                it.originalContent.lowercase().contains(q) ||
+                (it.summary?.lowercase()?.contains(q) == true) ||
+                it.tags.any { tag -> tag.lowercase().contains(q) }
+        }
     }
     Column(Modifier.fillMaxSize()) {
         Text("Search", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))

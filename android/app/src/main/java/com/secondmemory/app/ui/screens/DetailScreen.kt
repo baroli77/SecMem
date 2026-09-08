@@ -98,7 +98,7 @@ fun DetailScreen(
     var title by remember(thing.id) { mutableStateOf(thing.title) }
     var laterOpen by remember { mutableStateOf(false) }
     var showAdjust by remember { mutableStateOf(false) }
-    val snooze = Resurface.snoozeOptions(settings = settings)
+    val snooze = remember(settings) { Resurface.snoozeOptions(settings = settings) }
     val closed = thing.status == ThingStatus.COMPLETED || thing.status == ThingStatus.ARCHIVED
     val body = displayBody(thing)
     val source = hostOf(thing.sourceUrl) ?: thing.siteName ?: thing.sourceApp

@@ -44,8 +44,9 @@ class MemoryViewModel(private val repo: MemoryRepository) : ViewModel() {
         viewModelScope.launch {
             val result = repo.capture(input)
             onResult(result)
-            if (!result.blocked && result.duplicate == null) {
-                repo.enrich(result.thing.id)
+            val saved = result.saved
+            if (saved != null && result.duplicate == null) {
+                repo.enrich(saved.id)
             }
         }
     }

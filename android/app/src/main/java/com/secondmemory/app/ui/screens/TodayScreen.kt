@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.secondmemory.app.domain.Resurface
@@ -28,10 +29,12 @@ fun TodayScreen(
     onArchive: (String) -> Unit,
     onPin: (String) -> Unit,
 ) {
-    val pinned = things.filter {
-        (it.isPinned || it.isFavourite) && it.status != ThingStatus.COMPLETED && it.status != ThingStatus.ARCHIVED
-    }.sortedByDescending { it.updatedAt }
-    val snooze = Resurface.snoozeOptions(settings = settings)
+    val pinned = remember(things) {
+        things.filter {
+            (it.isPinned || it.isFavourite) && it.status != ThingStatus.COMPLETED && it.status != ThingStatus.ARCHIVED
+        }.sortedByDescending { it.updatedAt }
+    }
+    val snooze = remember(settings) { Resurface.snoozeOptions(settings = settings) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
