@@ -22,6 +22,7 @@ import com.secondmemory.app.domain.Settings
 import com.secondmemory.app.domain.Thing
 import com.secondmemory.app.domain.ThingStatus
 import com.secondmemory.app.domain.thingActionVerb
+import com.secondmemory.app.domain.thingOpenVerb
 import java.io.File
 
 object NotificationHelper {
@@ -33,6 +34,7 @@ object NotificationHelper {
     const val ACTION_PIN = "com.secondmemory.app.PIN"
     const val ACTION_CHECK = "com.secondmemory.app.CHECK"
     const val EXTRA_THING_ID = "thingId"
+    const val EXTRA_OPEN_CONTENT = "openContent"
     private const val GROUP = "pinned"
     private const val SUMMARY_ID = 1
     private const val WELCOME_ID = 2
@@ -170,20 +172,14 @@ object NotificationHelper {
 
     fun openThing(context: Context, thing: Thing) {
         val view = viewIntent(context, thing)
-        runCatching { context.startActivity(view) }.onFailure {
-            context.startActivity(
-                Intent(context, MainActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                    putExtra(EXTRA_THING_ID, thing.id)
-                },
-            )
-        }
+        if (view.component?.className?.contains("MainActivity") == true) return
+        runCatching { context.startActivity(view) }
     }
 
     fun viewIntent(context: Context, thing: Thing): Intent {
         val file = thing.imageUri?.let { File(it) }?.takeIf { it.exists() }
         val url = thing.sourceUrl?.trim().orEmpty()
-        if (url.startsWith("https://") || url.startsWith("geo:")) {
+        if (url.startsWith("https://") || url.startsWith("http://") || url.startsWith("geo:")) {
             return Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
@@ -253,7 +249,7 @@ object NotificationHelper {
             builder.addAction(0, context.getString(R.string.notif_later), laterPi)
             builder.addAction(0, context.getString(R.string.notif_unpin), unpinPi)
         } else {
-            builder.addAction(0, thingActionVerb(thing), donePi)
+            builder.addAction(0, thingOpenVerb(thing), openPi)
             builder.addAction(0, context.getString(R.string.notif_later), laterPi)
             builder.addAction(0, context.getString(R.string.notif_unpin), unpinPi)
         }
@@ -298,12 +294,15 @@ object NotificationHelper {
     }
 
     private fun openPending(context: Context, thing: Thing): PendingIntent {
-        val view = viewIntent(context, thing)
-        val isApp = view.component?.className?.contains("MainActivity") == true
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(EXTRA_THING_ID, thing.id)
+            putExtra(EXTRA_OPEN_CONTENT, true)
+        }
         return PendingIntent.getActivity(
             context,
-            requestCode(thing, if (isApp) 5 else 6),
-            view,
+            requestCode(thing, 6),
+            intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
     }

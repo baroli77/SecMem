@@ -160,6 +160,13 @@ fun categoryLabel(category: Category): String = when (category) {
     Category.UNKNOWN -> "Saved"
 }
 
+fun thingOpenVerb(thing: Thing): String = when (thing.category) {
+    Category.READ -> "Read"
+    Category.WATCH -> "Watch"
+    Category.BUY -> "Open"
+    else -> "Open"
+}
+
 fun thingActionVerb(thing: Thing): String = when (thing.category) {
     Category.READ -> "Read"
     Category.WATCH -> "Watched"
