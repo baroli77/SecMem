@@ -15,6 +15,10 @@ import androidx.core.content.FileProvider
 import com.secondmemory.app.MainActivity
 import com.secondmemory.app.R
 import com.secondmemory.app.domain.ContentType
+import com.secondmemory.app.domain.Checklist
+import com.secondmemory.app.domain.PinStyle
+import com.secondmemory.app.domain.Priority
+import com.secondmemory.app.domain.Settings
 import com.secondmemory.app.domain.Thing
 import com.secondmemory.app.domain.ThingStatus
 import com.secondmemory.app.domain.thingActionVerb
@@ -27,12 +31,12 @@ object NotificationHelper {
     const val ACTION_UNPIN = "com.secondmemory.app.UNPIN"
     const val ACTION_OPEN = "com.secondmemory.app.OPEN"
     const val ACTION_PIN = "com.secondmemory.app.PIN"
-    const val ACTION_DISMISS = "com.secondmemory.app.DISMISS"
+    const val ACTION_CHECK = "com.secondmemory.app.CHECK"
     const val EXTRA_THING_ID = "thingId"
     private const val GROUP = "pinned"
     private const val SUMMARY_ID = 1
     private const val WELCOME_ID = 2
-    private const val PIN_LIMIT = 12
+    private const val PIN_LIMIT = 20
     private const val REPOST_WINDOW_MS = 20_000L
 
     fun isPinned(thing: Thing): Boolean = thing.isPinned || thing.isFavourite
@@ -61,16 +65,25 @@ object NotificationHelper {
         }
     }
 
-    fun refreshPins(context: Context, things: List<Thing>, restoreMissing: Boolean = false) {
+    fun refreshPins(
+        context: Context,
+        things: List<Thing>,
+        settings: Settings = Settings(),
+        restoreMissing: Boolean = false,
+    ) {
         ensureChannel(context)
         val nm = NotificationManagerCompat.from(context)
-        if (!nm.areNotificationsEnabled()) {
+        if (!settings.notificationsEnabled || !nm.areNotificationsEnabled()) {
             clear(context)
             return
         }
         val pins = things.filter {
             isPinned(it) && it.status != ThingStatus.COMPLETED && it.status != ThingStatus.ARCHIVED
-        }.sortedByDescending { it.updatedAt }
+        }.sortedWith(
+            compareBy<Thing> { it.sortOrder }
+                .thenByDescending { it.priority == Priority.HIGH }
+                .thenByDescending { it.updatedAt },
+        )
         val visible = pins.take(PIN_LIMIT)
         val wanted = visible.map { pinId(it) }.toSet() + setOf(SUMMARY_ID)
         val active = activeIds(context).toSet()
@@ -82,11 +95,11 @@ object NotificationHelper {
             val wasShowing = id in active
             val justPinned = now - thing.updatedAt < REPOST_WINDOW_MS
             if (wasShowing || restoreMissing || justPinned) {
-                showPin(context, thing, withThumb = index < 3)
+                showPin(context, thing, withThumb = index < 3, settings = settings, overflow = pins.size - PIN_LIMIT)
                 showing += 1
             }
         }
-        if (showing == 0) nm.cancel(SUMMARY_ID) else showSummary(context, visible)
+        if (showing == 0) nm.cancel(SUMMARY_ID) else showSummary(context, pins)
     }
 
     fun clear(context: Context) {
@@ -185,27 +198,35 @@ object NotificationHelper {
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
             }
         }
-        if (url.isNotBlank()) {
-            return Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            }
-        }
         return Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra(EXTRA_THING_ID, thing.id)
         }
     }
 
-    private fun showPin(context: Context, thing: Thing, withThumb: Boolean) {
+    private fun showPin(
+        context: Context,
+        thing: Thing,
+        withThumb: Boolean,
+        settings: Settings,
+        overflow: Int = 0,
+    ) {
         val openPi = openPending(context, thing)
         val donePi = actionPi(context, ACTION_DONE, thing.id, requestCode(thing, 3))
         val laterPi = actionPi(context, ACTION_LATER, thing.id, requestCode(thing, 4))
         val unpinPi = actionPi(context, ACTION_UNPIN, thing.id, requestCode(thing, 8))
+        val items = Checklist.parse(thing.checklist).ifEmpty { Checklist.fromNotes(thing.notes) }
+        val checkLines = Checklist.linesForNotification(items)
+        val body = if (checkLines.isNotEmpty()) {
+            checkLines.joinToString("\n")
+        } else {
+            pinBody(thing)
+        }
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_memory)
             .setContentTitle(thing.title)
-            .setContentText(pinSubtitle(thing))
-            .setStyle(NotificationCompat.BigTextStyle().bigText(pinBody(thing)))
+            .setContentText(if (checkLines.isNotEmpty()) checkLines.first() else pinSubtitle(thing))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setContentIntent(openPi)
             .setDeleteIntent(unpinPi)
             .setOngoing(true)
@@ -214,13 +235,28 @@ object NotificationHelper {
             .setSilent(true)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setGroup(GROUP)
-            .setSortKey(thing.createdAt.toString())
-            .addAction(0, thingActionVerb(thing), donePi)
-            .addAction(0, context.getString(R.string.notif_later), laterPi)
-            .addAction(0, context.getString(R.string.notif_unpin), unpinPi)
-            .setColor(0xFF2C5C4F.toInt())
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setSortKey(thing.sortOrder.toString().padStart(8, '0'))
+            .setColor(PinStyle.argb(thing.pinColor))
+            .setVisibility(
+                if (settings.lockScreenPrivate) NotificationCompat.VISIBILITY_PRIVATE
+                else NotificationCompat.VISIBILITY_PUBLIC,
+            )
+            .setPriority(
+                when (thing.priority) {
+                    Priority.HIGH -> NotificationCompat.PRIORITY_HIGH
+                    Priority.LOW -> NotificationCompat.PRIORITY_LOW
+                    else -> NotificationCompat.PRIORITY_DEFAULT
+                },
+            )
+        if (items.any { !it.done }) {
+            builder.addAction(0, context.getString(R.string.notif_check), actionPi(context, ACTION_CHECK, thing.id, requestCode(thing, 9)))
+            builder.addAction(0, context.getString(R.string.notif_later), laterPi)
+            builder.addAction(0, context.getString(R.string.notif_unpin), unpinPi)
+        } else {
+            builder.addAction(0, thingActionVerb(thing), donePi)
+            builder.addAction(0, context.getString(R.string.notif_later), laterPi)
+            builder.addAction(0, context.getString(R.string.notif_unpin), unpinPi)
+        }
         if (withThumb) thumb(thing)?.let { builder.setLargeIcon(it) }
         try {
             NotificationManagerCompat.from(context).notify(pinId(thing), builder.build())
@@ -237,12 +273,13 @@ object NotificationHelper {
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val style = NotificationCompat.InboxStyle().setBigContentTitle("${pins.size} pinned")
+        val extra = if (pins.size > PIN_LIMIT) " · ${pins.size - PIN_LIMIT} more in the app" else ""
+        val style = NotificationCompat.InboxStyle().setBigContentTitle("${pins.size} pinned$extra")
         pins.take(7).forEach { style.addLine(it.title) }
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_memory)
             .setContentTitle("${pins.size} pinned")
-            .setContentText(pins.take(3).joinToString(" · ") { it.title })
+            .setContentText(pins.take(3).joinToString(" · ") { it.title } + extra)
             .setStyle(style)
             .setContentIntent(openPi)
             .setOngoing(true)

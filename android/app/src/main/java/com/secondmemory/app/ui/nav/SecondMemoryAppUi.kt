@@ -81,12 +81,7 @@ fun SecondMemoryAppUi(
         val route = nav.currentBackStackEntryAsState().value?.destination?.route
 
         LaunchedEffect(things, settings.notificationsEnabled) {
-            if (settings.notificationsEnabled) {
-                NotificationHelper.refreshPins(context, things)
-            } else {
-                NotificationHelper.clear(context)
-            }
-            ReminderScheduler.scheduleNext(context, things)
+            vm.syncShade(context)
         }
 
         fun markDone(id: String) {
@@ -261,6 +256,8 @@ fun SecondMemoryAppUi(
                         onPatch = vm::patchSettings,
                         onLoadExamples = vm::loadExamples,
                         onReset = vm::resetAll,
+                        onExport = { uri, pw -> vm.exportBackup(context, uri, pw) },
+                        onImport = { uri, pw -> vm.importBackup(context, uri, pw) },
                     )
                 }
                 composable(
@@ -283,6 +280,10 @@ fun SecondMemoryAppUi(
                         onNotes = { notes -> id?.let { vm.updateNotes(it, notes) } },
                         onTitle = { title -> id?.let { vm.updateTitle(it, title) } },
                         onCategory = { cat -> id?.let { vm.updateCategory(it, cat) } },
+                        onChecklist = { raw -> id?.let { vm.setChecklist(it, raw) } },
+                        onColor = { color -> id?.let { vm.setPinColor(it, color) } },
+                        onPriority = { p -> id?.let { vm.setPriority(it, p) } },
+                        onExpires = { at -> id?.let { vm.setExpiresAt(it, at) } },
                     )
                 }
             }

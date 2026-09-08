@@ -127,15 +127,25 @@ object MetadataFetcher {
 
         val title = prop("title")
             ?: Regex("""<title[^>]*>([^<]+)</title>""", RegexOption.IGNORE_CASE).find(html)?.groupValues?.get(1)?.decode()
+        val rawCanonical = Regex(
+            """<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']""",
+            RegexOption.IGNORE_CASE,
+        ).find(html)?.groupValues?.get(1) ?: fallbackUrl
+        val canonical = try {
+            URL(URL(fallbackUrl), rawCanonical).toString()
+        } catch (_: Exception) {
+            rawCanonical
+        }
+        val imageRaw = prop("image")
+        val image = imageRaw?.let {
+            try { URL(URL(fallbackUrl), it).toString() } catch (_: Exception) { it }
+        }
         return UrlMetadata(
             title = title,
             description = prop("description"),
-            image = prop("image"),
+            image = sanitize(image ?: "")?.toString(),
             siteName = prop("site_name"),
-            canonicalUrl = Regex(
-                """<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']""",
-                RegexOption.IGNORE_CASE,
-            ).find(html)?.groupValues?.get(1) ?: fallbackUrl,
+            canonicalUrl = sanitize(canonical)?.toString() ?: fallbackUrl,
         )
     }
 

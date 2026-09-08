@@ -64,6 +64,11 @@ data class ThingEntity(
     val ocrText: String?,
     val siteName: String?,
     val notifId: Int = 0,
+    val sortOrder: Int = 0,
+    val pinColor: String = "forest",
+    val checklist: String = "",
+    val expiresAt: Long? = null,
+    val ogImageUrl: String? = null,
 )
 
 @Entity(tableName = "activities")
@@ -118,6 +123,11 @@ fun ThingEntity.toDomain(): Thing = Thing(
     ocrText = ocrText,
     siteName = siteName,
     notifId = notifId,
+    sortOrder = sortOrder,
+    pinColor = pinColor,
+    checklist = checklist,
+    expiresAt = expiresAt,
+    ogImageUrl = ogImageUrl,
 )
 
 fun Thing.toEntity(): ThingEntity = ThingEntity(
@@ -162,6 +172,11 @@ fun Thing.toEntity(): ThingEntity = ThingEntity(
     ocrText = ocrText,
     siteName = siteName,
     notifId = notifId,
+    sortOrder = sortOrder,
+    pinColor = pinColor,
+    checklist = checklist,
+    expiresAt = expiresAt,
+    ogImageUrl = ogImageUrl,
 )
 
 fun ActivityEntity.toDomain(): ActivityEvent =

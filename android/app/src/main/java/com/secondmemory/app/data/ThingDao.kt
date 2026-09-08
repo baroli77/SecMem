@@ -30,6 +30,9 @@ interface ThingDao {
     @Query("SELECT COALESCE(MAX(notifId), 100) FROM things")
     suspend fun maxNotifId(): Int
 
+    @Query("SELECT COALESCE(MIN(sortOrder), 0) FROM things")
+    suspend fun minSortOrder(): Int
+
     @Query(
         """
         UPDATE things SET processingStatus = 'FAILED', processingError = 'stale'

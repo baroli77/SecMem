@@ -188,7 +188,7 @@ private fun ThingList(
                         )
                     }
                     Text(
-                        "Swipe right to mark done. Swipe left to snooze until tonight.",
+                        "Swipe right to mark done. Swipe left to pin or unpin.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 8.dp),

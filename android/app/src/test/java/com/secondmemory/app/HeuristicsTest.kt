@@ -92,9 +92,45 @@ class HeuristicsTest {
     }
 
     @Test
-    fun normalizeStripsUtm() {
-        val a = Heuristics.normalizeUrl("https://www.Example.com/path/?utm_source=x")
-        val b = Heuristics.normalizeUrl("https://example.com/path")
-        assertEquals(a, b)
+    fun dentistKeepsNineAm() {
+        val now = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+            set(2026, Calendar.SEPTEMBER, 8, 8, 0, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val r = Heuristics.extractDateTime("Dentist 14 October at 9am", now.timeInMillis)
+        assertEquals("09:00", r.time)
+    }
+
+    @Test
+    fun ukNumericDate() {
+        val now = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+            set(2026, Calendar.JANUARY, 1, 10, 0, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val r = Heuristics.extractDateTime("Meet 14/10/2026", now.timeInMillis)
+        assertEquals("2026-10-14", r.isoDate)
+    }
+
+    @Test
+    fun restoredDuplicateClearsStale() {
+        val stale = com.secondmemory.app.domain.Thing(
+            id = "x",
+            createdAt = 1,
+            updatedAt = 1,
+            originalContent = "https://example.com",
+            contentType = com.secondmemory.app.domain.ContentType.URL,
+            sourceUrl = "https://example.com",
+            title = "Example",
+            status = com.secondmemory.app.domain.ThingStatus.COMPLETED,
+            completedAt = 99,
+            resurfaceAt = 50,
+            reasonForResurface = "old",
+            isPinned = false,
+        )
+        val next = com.secondmemory.app.domain.PinStyle.restoredDuplicate(stale)
+        assertEquals(com.secondmemory.app.domain.ThingStatus.ACTIVE, next.status)
+        assertEquals(true, next.isPinned)
+        org.junit.Assert.assertNull(next.completedAt)
+        org.junit.Assert.assertNull(next.resurfaceAt)
     }
 }

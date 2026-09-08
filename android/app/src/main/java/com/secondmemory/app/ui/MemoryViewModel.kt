@@ -1,5 +1,6 @@
 package com.secondmemory.app.ui
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -10,6 +11,7 @@ import com.secondmemory.app.domain.Category
 import com.secondmemory.app.domain.Settings
 import com.secondmemory.app.domain.Thing
 import com.secondmemory.app.domain.ThingStatus
+import com.secondmemory.app.notify.ShadeSync
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -64,9 +66,29 @@ class MemoryViewModel(private val repo: MemoryRepository) : ViewModel() {
     fun updateTitle(id: String, title: String) = viewModelScope.launch { repo.updateTitle(id, title) }
     fun updateCategory(id: String, category: Category) = viewModelScope.launch { repo.updateCategory(id, category) }
     fun patchSettings(transform: (Settings) -> Settings) = viewModelScope.launch { repo.patchSettings(transform) }
-    fun completeOnboarding() = viewModelScope.launch { repo.completeOnboarding(loadExamples = true) }
+    fun completeOnboarding() = viewModelScope.launch { repo.completeOnboarding(loadExamples = false) }
     fun loadExamples() = viewModelScope.launch { repo.loadExamples() }
     fun resetAll() = viewModelScope.launch { repo.resetAll() }
+    fun setChecklist(id: String, raw: String) = viewModelScope.launch { repo.setChecklist(id, raw) }
+    fun setPinColor(id: String, color: String) = viewModelScope.launch { repo.setPinColor(id, color) }
+    fun setPriority(id: String, priority: com.secondmemory.app.domain.Priority) =
+        viewModelScope.launch { repo.setPriority(id, priority) }
+    fun setExpiresAt(id: String, at: Long?) = viewModelScope.launch { repo.setExpiresAt(id, at) }
+    fun movePin(id: String, delta: Int) = viewModelScope.launch { repo.movePin(id, delta) }
+    fun syncShade(context: Context) = viewModelScope.launch { ShadeSync.refresh(context, repo) }
+
+    fun exportBackup(context: Context, uri: android.net.Uri, password: String?) = viewModelScope.launch {
+        val json = com.secondmemory.app.data.Backup.snapshot(things.value, settings.value)
+        val bytes = com.secondmemory.app.data.Backup.pack(context, json, password)
+        com.secondmemory.app.data.Backup.write(context, uri, bytes)
+    }
+
+    fun importBackup(context: Context, uri: android.net.Uri, password: String?) = viewModelScope.launch {
+        val bytes = com.secondmemory.app.data.Backup.read(context, uri)
+        val (json, files) = com.secondmemory.app.data.Backup.unpack(bytes, password)
+        repo.importSnapshot(json, files)
+        ShadeSync.refresh(context, repo)
+    }
 
     fun inbox(things: List<Thing>) = things.filter { it.status == ThingStatus.INBOX }
     fun library(things: List<Thing>, query: String = "", category: Category? = null): List<Thing> {

@@ -16,9 +16,10 @@ class ResurfaceWorker(
     override suspend fun doWork(): Result {
         val app = applicationContext as? SecondMemoryApp ?: return Result.success()
         val repo = app.container.repository
+        repo.expireDuePins()
         val due = repo.tickAndCollectDue()
         due.forEach { repo.setPinned(it.id, true) }
-        NotificationHelper.refreshPins(applicationContext, repo.currentThings())
+        ShadeSync.refresh(applicationContext, repo)
         return Result.success()
     }
 

@@ -16,7 +16,7 @@ import androidx.lifecycle.lifecycleScope
 import com.secondmemory.app.domain.CaptureInput
 import com.secondmemory.app.domain.Heuristics
 import com.secondmemory.app.notify.NotificationHelper
-import com.secondmemory.app.notify.ReminderScheduler
+import com.secondmemory.app.notify.ShadeSync
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -30,10 +30,8 @@ class ShareCaptureActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
         lifecycleScope.launch {
-            if (granted) {
-                (application as SecondMemoryApp).container.repository.patchSettings {
-                    it.copy(notificationsEnabled = true, notificationsAsked = true)
-                }
+            (application as SecondMemoryApp).container.repository.patchSettings {
+                it.copy(notificationsEnabled = granted, notificationsAsked = true)
             }
             publishAndFinish()
         }
@@ -51,19 +49,38 @@ class ShareCaptureActivity : ComponentActivity() {
     private suspend fun runCapture() {
         val app = application as SecondMemoryApp
         val inputs = withContext(Dispatchers.IO) { parseIntent(intent) }
+        if (inputs.isEmpty()) {
+            pendingMessage = "Nothing to save"
+            publishAndFinish()
+            return
+        }
         var lastMessage = getString(R.string.saved_toast)
-        inputs.forEach { input ->
-            val result = app.container.repository.capture(input)
-            val saved = result.saved
-            if (saved != null && result.duplicate == null) {
-                withContext(Dispatchers.IO) { app.container.repository.enrich(saved.id) }
+        for (input in inputs) {
+            val result = app.container.repository.capture(input.copy(imageUri = null))
+            var saved = result.saved
+            if (result.blocked) {
+                lastMessage = "Free limit reached — upgrade in Settings"
+                continue
             }
-            lastMessage = when {
-                result.blocked -> "Free limit reached — upgrade in Settings"
-                result.duplicate != null -> "Already saved: ${result.duplicate.title}"
-                else -> getString(R.string.saved_toast)
+            if (result.duplicate != null) {
+                lastMessage = "Already saved: ${result.duplicate.title}"
+                if (saved != null) NotificationHelper.showJustSaved(this, saved)
+                continue
+            }
+            val pending = input.pendingStream
+            if (saved != null && pending != null) {
+                val path = persistSharedFile(Uri.parse(pending), input.mimeType, input.fileName)
+                if (path == null) {
+                    app.container.repository.remove(saved.id)
+                    lastMessage = "Couldn’t save that file"
+                    saved = null
+                } else {
+                    app.container.repository.setImageUri(saved.id, path)
+                }
             }
             if (saved != null) {
+                withContext(Dispatchers.IO) { app.container.repository.enrich(saved.id) }
+                lastMessage = getString(R.string.saved_toast)
                 NotificationHelper.showJustSaved(this, saved)
             }
         }
@@ -81,9 +98,7 @@ class ShareCaptureActivity : ComponentActivity() {
     private suspend fun publishAndFinish() {
         val app = application as SecondMemoryApp
         withContext(Dispatchers.IO) {
-            val things = app.container.repository.currentThings()
-            NotificationHelper.refreshPins(this@ShareCaptureActivity, things)
-            ReminderScheduler.scheduleNext(this@ShareCaptureActivity, things)
+            ShadeSync.refresh(this@ShareCaptureActivity, app.container.repository)
         }
         Toast.makeText(this, pendingMessage, Toast.LENGTH_SHORT).show()
         finish()
@@ -98,10 +113,11 @@ class ShareCaptureActivity : ComponentActivity() {
         val source = friendlySource()
         val streams = streamUris(intent)
         if (streams.isEmpty()) {
+            if (combined.isNullOrBlank()) return emptyList()
             return listOf(
                 CaptureInput(
                     text = combined,
-                    url = Heuristics.extractFirstUrl(combined.orEmpty()),
+                    url = Heuristics.extractFirstUrl(combined),
                     mimeType = mime,
                     sourceApp = source,
                 ),
@@ -110,14 +126,13 @@ class ShareCaptureActivity : ComponentActivity() {
         return streams.map { uri ->
             val name = queryName(uri)
             val resolvedMime = contentResolver.getType(uri) ?: mime
-            val path = persistSharedFile(uri, resolvedMime, name)
             CaptureInput(
                 text = combined,
                 url = Heuristics.extractFirstUrl(combined.orEmpty()),
-                imageUri = path,
                 mimeType = resolvedMime,
                 sourceApp = source,
                 fileName = name,
+                pendingStream = uri.toString(),
             )
         }
     }

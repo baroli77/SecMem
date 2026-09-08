@@ -7,9 +7,11 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import com.secondmemory.app.SecondMemoryApp
+import com.secondmemory.app.domain.Resurface
 import com.secondmemory.app.domain.Thing
 import com.secondmemory.app.domain.ThingStatus
 import kotlinx.coroutines.launch
+import java.util.Calendar
 
 object ReminderScheduler {
     private const val REQUEST = 42
@@ -21,20 +23,11 @@ object ReminderScheduler {
         val now = System.currentTimeMillis()
         val nextAt = things
             .filter { it.status != ThingStatus.COMPLETED && it.status != ThingStatus.ARCHIVED }
-            .filter { !NotificationHelper.isPinned(it) }
+            .filter { !NotificationHelper.isPinned(it) && it.reasonForResurface == "Snoozed" }
             .mapNotNull { it.resurfaceAt }
             .filter { it > now + 15_000L }
             .minOrNull() ?: return
-        try {
-            val canExact = Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms()
-            if (canExact) {
-                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, nextAt, pi)
-            } else {
-                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, nextAt, pi)
-            }
-        } catch (_: SecurityException) {
-            am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, nextAt, pi)
-        }
+        am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, nextAt, pi)
     }
 
     private fun pending(context: Context): PendingIntent {
@@ -56,10 +49,13 @@ class ReminderReceiver : BroadcastReceiver() {
             try {
                 val repo = app.container.repository
                 val due = repo.tickAndCollectDue()
+                val settings = repo.currentSettings()
+                if (Resurface.isQuietHours(Calendar.getInstance(), settings)) {
+                    ShadeSync.refresh(context, repo)
+                    return@launch
+                }
                 due.forEach { repo.setPinned(it.id, true) }
-                val things = repo.currentThings()
-                NotificationHelper.refreshPins(context, things)
-                ReminderScheduler.scheduleNext(context, things)
+                ShadeSync.refresh(context, repo)
             } finally {
                 pending.finish()
             }
@@ -77,9 +73,7 @@ class BootReceiver : BroadcastReceiver() {
         val app = context.applicationContext as SecondMemoryApp
         app.container.scope.launch {
             try {
-                val things = app.container.repository.currentThings()
-                NotificationHelper.refreshPins(context, things, restoreMissing = true)
-                ReminderScheduler.scheduleNext(context, things)
+                ShadeSync.refresh(context, app.container.repository, restoreMissing = true)
             } finally {
                 pending.finish()
             }

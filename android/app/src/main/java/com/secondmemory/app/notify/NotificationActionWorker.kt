@@ -7,6 +7,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.secondmemory.app.SecondMemoryApp
+import com.secondmemory.app.domain.Checklist
 import com.secondmemory.app.domain.Resurface
 import java.util.Calendar
 
@@ -21,20 +22,26 @@ class NotificationActionWorker(
         val repo = app.container.repository
         when (action) {
             NotificationHelper.ACTION_DONE -> repo.complete(id)
-            NotificationHelper.ACTION_UNPIN, NotificationHelper.ACTION_DISMISS -> repo.setPinned(id, false)
+            NotificationHelper.ACTION_UNPIN -> repo.setPinned(id, false)
             NotificationHelper.ACTION_PIN -> repo.setPinned(id, true)
             NotificationHelper.ACTION_LATER -> {
                 val until = Resurface.snoozeOptions(Calendar.getInstance()).firstOrNull { it.id == "tonight" }?.at
                     ?: Resurface.snoozeOptions(Calendar.getInstance()).first().at
                 repo.snooze(id, until)
             }
+            NotificationHelper.ACTION_CHECK -> {
+                val thing = repo.currentThings().firstOrNull { it.id == id }
+                if (thing != null) {
+                    val items = Checklist.parse(thing.checklist).ifEmpty { Checklist.fromNotes(thing.notes) }
+                    repo.setChecklist(id, Checklist.format(Checklist.checkNext(items)))
+                }
+            }
             NotificationHelper.ACTION_OPEN -> {
                 val thing = repo.currentThings().firstOrNull { it.id == id }
                 if (thing != null) NotificationHelper.openThing(applicationContext, thing)
             }
         }
-        NotificationHelper.refreshPins(applicationContext, repo.currentThings())
-        ReminderScheduler.scheduleNext(applicationContext, repo.currentThings())
+        ShadeSync.refresh(applicationContext, repo)
         return Result.success()
     }
 

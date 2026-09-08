@@ -14,5 +14,7 @@
     <string name="saved_toast">Saved</string>
     <string name="welcome_notif_title">Pins will live here</string>
     <string name="welcome_notif_body">Anything you share or pin stays in this shade until you unpin it. No schedule. No nagging.</string>
-    <string name="swipe_hint">Swipe right to mark done. Swipe left to unpin.</string>
+    <string name="notif_check">Check</string>
+    <string name="widget_description">How many things are pinned in the shade</string>
+    <string name="tile_label">Pin clipboard</string>
 </resources>

@@ -5,9 +5,8 @@ import com.secondmemory.app.data.AppDatabase
 import com.secondmemory.app.data.CaptureFiles
 import com.secondmemory.app.data.MemoryRepository
 import com.secondmemory.app.data.SettingsStore
-import com.secondmemory.app.notify.NotificationHelper
-import com.secondmemory.app.notify.ReminderScheduler
 import com.secondmemory.app.notify.ResurfaceWorker
+import com.secondmemory.app.notify.ShadeSync
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,15 +30,13 @@ class SecondMemoryApp : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
-        NotificationHelper.ensureChannel(this)
         ResurfaceWorker.schedule(this)
         container.scope.launch {
             container.repository.failStaleProcessing()
             container.repository.assignMissingNotifIds()
             container.repository.pruneCaptureFiles()
-            val things = container.repository.currentThings()
-            NotificationHelper.refreshPins(this@SecondMemoryApp, things, restoreMissing = true)
-            ReminderScheduler.scheduleNext(this@SecondMemoryApp, things)
+            container.repository.expireDuePins()
+            ShadeSync.refresh(this@SecondMemoryApp, container.repository, restoreMissing = true)
         }
     }
 }

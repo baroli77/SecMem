@@ -6,6 +6,7 @@ import com.secondmemory.app.domain.CaptureResult
 import com.secondmemory.app.domain.Category
 import com.secondmemory.app.domain.FREE_ACTIVE_LIMIT
 import com.secondmemory.app.domain.Heuristics
+import com.secondmemory.app.domain.PinStyle
 import com.secondmemory.app.domain.Priority
 import com.secondmemory.app.domain.ProcessingStatus
 import com.secondmemory.app.domain.Resurface
@@ -47,11 +48,9 @@ class MemoryRepository(
                 parsed.sourceUrl,
             )
             if (duplicate != null) {
-                val pinned = if (duplicate.isPinned) duplicate else {
-                    duplicate.copy(isPinned = true, status = ThingStatus.ACTIVE, updatedAt = System.currentTimeMillis())
-                        .also { dao.upsert(it.toEntity()) }
-                }
-                return CaptureResult(thing = pinned, duplicate = duplicate)
+                val restored = PinStyle.restoredDuplicate(duplicate)
+                dao.upsert(restored.toEntity())
+                return CaptureResult(thing = restored, duplicate = duplicate)
             }
         }
         if (!settings.isPro && dao.activeCount() >= FREE_ACTIVE_LIMIT) {
@@ -59,6 +58,7 @@ class MemoryRepository(
         }
 
         val now = System.currentTimeMillis()
+        val expiryHours = settings.pinExpiryHours
         val draft = Thing(
             id = Seed.nid(),
             createdAt = now,
@@ -82,6 +82,8 @@ class MemoryRepository(
             detectedPerson = parsed.detectedPerson,
             processingStatus = if (settings.automaticProcessing) ProcessingStatus.QUEUED else ProcessingStatus.NONE,
             notifId = dao.maxNotifId() + 1,
+            sortOrder = dao.minSortOrder() - 1,
+            expiresAt = if (expiryHours > 0) now + expiryHours * 3600_000L else null,
         )
         dao.upsert(draft.toEntity())
         log("captured", draft)
@@ -108,6 +110,7 @@ class MemoryRepository(
             var sourceUrl = existing.sourceUrl
             var category = existing.category
             var tags = existing.tags
+            var ogImage = existing.ogImageUrl
             val url = existing.sourceUrl
             if (!url.isNullOrBlank()) {
                 val meta = MetadataFetcher.fetch(url)
@@ -115,7 +118,8 @@ class MemoryRepository(
                     title = meta.title?.takeIf { it.length >= 3 } ?: title
                     summary = meta.description ?: summary
                     siteName = meta.siteName ?: siteName
-                    sourceUrl = meta.canonicalUrl ?: sourceUrl
+                    sourceUrl = MetadataFetcher.sanitize(meta.canonicalUrl ?: "")?.toString() ?: sourceUrl
+                    ogImage = MetadataFetcher.sanitize(meta.image ?: "")?.toString() ?: ogImage
                     if (category == Category.UNKNOWN || category == Category.READ) {
                         val reclass = Heuristics.extractSignals(existing.originalContent, sourceUrl)
                         if (reclass.category != Category.UNKNOWN) {
@@ -134,6 +138,7 @@ class MemoryRepository(
                     sourceUrl = sourceUrl,
                     category = category,
                     tags = tags,
+                    ogImageUrl = ogImage,
                     aiProcessed = true,
                     aiProvider = "heuristic",
                     aiConfidence = 0.7f,
@@ -205,11 +210,16 @@ class MemoryRepository(
     }
 
     suspend fun setPinned(id: String, pinned: Boolean) = patch(id) {
+        val now = System.currentTimeMillis()
+        val settings = currentSettings()
         it.copy(
             isPinned = pinned,
             isFavourite = false,
-            resurfaceAt = if (pinned) null else it.resurfaceAt?.takeIf { at -> at > System.currentTimeMillis() },
-            reasonForResurface = if (pinned) null else it.reasonForResurface,
+            resurfaceAt = null,
+            reasonForResurface = null,
+            expiresAt = if (pinned && settings.pinExpiryHours > 0) {
+                now + settings.pinExpiryHours * 3600_000L
+            } else if (pinned) null else it.expiresAt,
             status = if (pinned && (it.status == ThingStatus.COMPLETED || it.status == ThingStatus.ARCHIVED)) {
                 ThingStatus.ACTIVE
             } else {
@@ -217,6 +227,7 @@ class MemoryRepository(
             },
             completedAt = if (pinned) null else it.completedAt,
             archivedAt = if (pinned) null else it.archivedAt,
+            sortOrder = if (pinned) dao.minSortOrder() - 1 else it.sortOrder,
         )
     }
 
@@ -264,9 +275,24 @@ class MemoryRepository(
     suspend fun updateNotes(id: String, notes: String) = patch(id) { it.copy(notes = notes) }
     suspend fun updateTitle(id: String, title: String) = patch(id) { it.copy(title = title) }
     suspend fun updateCategory(id: String, category: Category) = patch(id) {
-        val settings = currentSettings()
-        val suggestion = Resurface.suggestResurfaceAt(it.copy(category = category), settings)
-        it.copy(category = category, resurfaceAt = suggestion.first, reasonForResurface = suggestion.second)
+        it.copy(category = category)
+    }
+
+    suspend fun setImageUri(id: String, path: String) = patch(id) { it.copy(imageUri = path) }
+    suspend fun setChecklist(id: String, raw: String) = patch(id) { it.copy(checklist = raw) }
+    suspend fun setPinColor(id: String, color: String) = patch(id) { it.copy(pinColor = color) }
+    suspend fun setPriority(id: String, priority: Priority) = patch(id) { it.copy(priority = priority) }
+    suspend fun setExpiresAt(id: String, at: Long?) = patch(id) { it.copy(expiresAt = at) }
+    suspend fun movePin(id: String, delta: Int) = patch(id) { it.copy(sortOrder = it.sortOrder + delta) }
+
+    suspend fun expireDuePins(): Int {
+        val now = System.currentTimeMillis()
+        var n = 0
+        currentThings().filter { it.isPinned && it.expiresAt != null && it.expiresAt <= now }.forEach {
+            setPinned(it.id, false)
+            n += 1
+        }
+        return n
     }
 
     suspend fun markResurfaced(id: String) = patch(id) {
@@ -278,7 +304,14 @@ class MemoryRepository(
     }.also { log("resurfaced", it) }
 
     suspend fun tickAndCollectDue(): List<Thing> {
-        val due = Resurface.tick(currentThings())
+        val due = currentThings().filter {
+            it.resurfaceAt != null &&
+                it.resurfaceAt <= System.currentTimeMillis() &&
+                it.reasonForResurface == "Snoozed" &&
+                it.status != ThingStatus.COMPLETED &&
+                it.status != ThingStatus.ARCHIVED &&
+                !it.isPinned
+        }
         due.forEach { markResurfaced(it.id) }
         return due
     }
@@ -297,7 +330,7 @@ class MemoryRepository(
 
     suspend fun patchSettings(transform: (Settings) -> Settings) = settingsStore.update(transform)
 
-    suspend fun completeOnboarding(loadExamples: Boolean = true) {
+    suspend fun completeOnboarding(loadExamples: Boolean = false) {
         settingsStore.update { it.copy(onboardingComplete = true) }
         if (loadExamples && dao.getThings().isEmpty()) {
             dao.upsertAll(Seed.examples().map { it.toEntity() })
@@ -317,6 +350,53 @@ class MemoryRepository(
         }
         CaptureFiles.deleteAll(capturesDir)
         settingsStore.update { Settings() }
+    }
+
+    suspend fun importSnapshot(json: org.json.JSONObject, files: Map<String, ByteArray>) {
+        val arr = json.optJSONArray("things") ?: return
+        val now = System.currentTimeMillis()
+        val entities = mutableListOf<ThingEntity>()
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            val oldPath = o.optString("imageUri").takeIf { it.isNotBlank() }
+            val fileName = oldPath?.let { java.io.File(it).name }
+            var imageUri = oldPath
+            if (fileName != null && files.containsKey(fileName)) {
+                val dest = java.io.File(capturesDir, fileName)
+                dest.outputStream().use { it.write(files.getValue(fileName)) }
+                imageUri = dest.absolutePath
+            }
+            entities += Thing(
+                id = o.optString("id").ifBlank { Seed.nid() },
+                createdAt = o.optLong("createdAt", now),
+                updatedAt = o.optLong("updatedAt", now),
+                originalContent = o.optString("originalContent"),
+                contentType = runCatching { com.secondmemory.app.domain.ContentType.valueOf(o.optString("contentType")) }
+                    .getOrDefault(com.secondmemory.app.domain.ContentType.TEXT),
+                sourceUrl = o.optString("sourceUrl").takeIf { it.isNotBlank() },
+                sourceApp = o.optString("sourceApp").takeIf { it.isNotBlank() },
+                title = o.optString("title").ifBlank { "Imported" },
+                summary = o.optString("summary").takeIf { it.isNotBlank() },
+                notes = o.optString("notes").takeIf { it.isNotBlank() },
+                imageUri = imageUri,
+                mimeType = o.optString("mimeType").takeIf { it.isNotBlank() },
+                category = runCatching { Category.valueOf(o.optString("category")) }.getOrDefault(Category.UNKNOWN),
+                status = runCatching { ThingStatus.valueOf(o.optString("status")) }.getOrDefault(ThingStatus.ACTIVE),
+                priority = runCatching { Priority.valueOf(o.optString("priority")) }.getOrDefault(Priority.NORMAL),
+                dueAt = o.optLong("dueAt").takeIf { o.has("dueAt") && !o.isNull("dueAt") && it != 0L },
+                isPinned = o.optBoolean("isPinned"),
+                tags = o.optString("tags").split("|").filter { it.isNotBlank() },
+                checklist = o.optString("checklist"),
+                pinColor = o.optString("pinColor").ifBlank { "forest" },
+                sortOrder = o.optInt("sortOrder"),
+                expiresAt = o.optLong("expiresAt").takeIf { o.has("expiresAt") && !o.isNull("expiresAt") && it != 0L },
+                ogImageUrl = o.optString("ogImageUrl").takeIf { it.isNotBlank() },
+                siteName = o.optString("siteName").takeIf { it.isNotBlank() },
+                ocrText = o.optString("ocrText").takeIf { it.isNotBlank() },
+                notifId = dao.maxNotifId() + 1 + i,
+            ).toEntity()
+        }
+        dao.upsertAll(entities)
     }
 
     private suspend fun patch(id: String, transform: suspend (Thing) -> Thing): Thing? = write.withLock {

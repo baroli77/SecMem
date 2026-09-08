@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [ThingEntity::class, ActivityEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -27,9 +27,19 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE things ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE things ADD COLUMN pinColor TEXT NOT NULL DEFAULT 'forest'")
+                db.execSQL("ALTER TABLE things ADD COLUMN checklist TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE things ADD COLUMN expiresAt INTEGER")
+                db.execSQL("ALTER TABLE things ADD COLUMN ogImageUrl TEXT")
+            }
+        }
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "second-memory.db")
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
     }
 }

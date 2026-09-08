@@ -280,20 +280,20 @@ object Heuristics {
         var minute = 0
 
         val explicitTime = Regex("""\b([01]?\d|2[0-3]):([0-5]\d)\b""").find(content)
-        val timeMatch = Regex("""\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b""", RegexOption.IGNORE_CASE).find(content)
-        if (explicitTime != null) {
-            hour = explicitTime.groupValues[1].toInt()
-            minute = explicitTime.groupValues[2].toInt()
-            time = "${pad(hour)}:${pad(minute)}"
-        } else if (timeMatch != null && timeMatch.groupValues[3].isNotEmpty()) {
-            hour = timeMatch.groupValues[1].toInt()
-            minute = timeMatch.groupValues[2].ifEmpty { "0" }.toInt()
-            val mer = timeMatch.groupValues[3].lowercase(Locale.ROOT)
+        val merTime = Regex("""\b(\d{1,2})(?::([0-5]\d))?\s*(am|pm)\b""", RegexOption.IGNORE_CASE).find(content)
+        if (merTime != null) {
+            hour = merTime.groupValues[1].toInt()
+            minute = merTime.groupValues[2].ifEmpty { "0" }.toInt()
+            val mer = merTime.groupValues[3].lowercase(Locale.ROOT)
             var h = hour!!
             if (mer == "pm" && h < 12) h += 12
             if (mer == "am" && h == 12) h = 0
             hour = h
             time = "${pad(h)}:${pad(minute)}"
+        } else if (explicitTime != null) {
+            hour = explicitTime.groupValues[1].toInt()
+            minute = explicitTime.groupValues[2].toInt()
+            time = "${pad(hour)}:${pad(minute)}"
         }
 
         when {
@@ -329,8 +329,28 @@ object Heuristics {
             foundDate = true
             val parts = it.groupValues[1].split("-")
             date = Calendar.getInstance().apply {
+                isLenient = false
                 set(parts[0].toInt(), parts[1].toInt() - 1, parts[2].toInt(), 0, 0, 0)
                 set(Calendar.MILLISECOND, 0)
+            }
+        }
+
+        Regex("""\b(\d{1,2})/(\d{1,2})/(20\d{2}|\d{2})\b""").find(content)?.let { m ->
+            val day = m.groupValues[1].toInt()
+            val month = m.groupValues[2].toInt()
+            var year = m.groupValues[3].toInt()
+            if (year < 100) year += 2000
+            if (day in 1..31 && month in 1..12) {
+                foundDate = true
+                date = Calendar.getInstance().apply {
+                    isLenient = false
+                    try {
+                        set(year, month - 1, day, 0, 0, 0)
+                        set(Calendar.MILLISECOND, 0)
+                    } catch (_: Exception) {
+                        foundDate = false
+                    }
+                }
             }
         }
 

@@ -56,6 +56,11 @@ data class Thing(
     val ocrText: String? = null,
     val siteName: String? = null,
     val notifId: Int = 0,
+    val sortOrder: Int = 0,
+    val pinColor: String = "forest",
+    val checklist: String = "",
+    val expiresAt: Long? = null,
+    val ogImageUrl: String? = null,
 )
 
 data class ActivityEvent(
@@ -86,6 +91,8 @@ data class Settings(
     val isPro: Boolean = false,
     val nudgesOn: String = "",
     val nudgesToday: Int = 0,
+    val lockScreenPrivate: Boolean = true,
+    val pinExpiryHours: Int = 0,
 )
 
 data class CaptureInput(
@@ -96,6 +103,7 @@ data class CaptureInput(
     val sourceApp: String? = null,
     val fileName: String? = null,
     val forceDuplicate: Boolean = false,
+    val pendingStream: String? = null,
 )
 
 data class CaptureResult(

@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.OpenInNew
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -52,6 +53,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.secondmemory.app.domain.Category
+import com.secondmemory.app.domain.Checklist
+import com.secondmemory.app.domain.PinStyle
+import com.secondmemory.app.domain.Priority
+import kotlinx.coroutines.delay
 import com.secondmemory.app.domain.Heuristics
 import com.secondmemory.app.domain.Resurface
 import com.secondmemory.app.domain.Settings
@@ -81,6 +86,10 @@ fun DetailScreen(
     onNotes: (String) -> Unit,
     onTitle: (String) -> Unit,
     onCategory: (Category) -> Unit,
+    onChecklist: (String) -> Unit = {},
+    onColor: (String) -> Unit = {},
+    onPriority: (Priority) -> Unit = {},
+    onExpires: (Long?) -> Unit = {},
 ) {
     LaunchedEffect(thing?.id) { if (thing != null) onOpen() }
     val context = LocalContext.current
@@ -98,6 +107,16 @@ fun DetailScreen(
     var title by remember(thing.id) { mutableStateOf(thing.title) }
     var laterOpen by remember { mutableStateOf(false) }
     var showAdjust by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    var newCheck by remember { mutableStateOf("") }
+    LaunchedEffect(notes) {
+        delay(450)
+        if (notes != thing.notes.orEmpty()) onNotes(notes)
+    }
+    LaunchedEffect(title) {
+        delay(450)
+        if (editingTitle && title != thing.title && title.isNotBlank()) onTitle(title)
+    }
     val snooze = remember(settings) { Resurface.snoozeOptions(settings = settings) }
     val closed = thing.status == ThingStatus.COMPLETED || thing.status == ThingStatus.ARCHIVED
     val body = displayBody(thing)
@@ -133,7 +152,7 @@ fun DetailScreen(
             if (editingTitle) {
                 OutlinedTextField(
                     value = title,
-                    onValueChange = { title = it; onTitle(it) },
+                    onValueChange = { title = it },
                     textStyle = MaterialTheme.typography.headlineMedium,
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
@@ -228,12 +247,70 @@ fun DetailScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 OutlinedButton(onClick = onArchive) { Text("Archive") }
-                OutlinedButton(onClick = onDelete) { Text("Delete") }
+                OutlinedButton(onClick = { confirmDelete = true }) { Text("Delete") }
+            }
+
+            val checks = remember(thing.checklist, thing.notes) {
+                Checklist.parse(thing.checklist).ifEmpty { Checklist.fromNotes(thing.notes) }
+            }
+            Text("Checklist", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 20.dp))
+            checks.forEachIndexed { index, item ->
+                Row(
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    androidx.compose.material3.Checkbox(
+                        checked = item.done,
+                        onCheckedChange = { onChecklist(Checklist.format(Checklist.toggle(checks, index))) },
+                    )
+                    Text(item.text)
+                }
+            }
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = newCheck,
+                    onValueChange = { newCheck = it },
+                    modifier = Modifier.weight(1f),
+                    label = { Text("Add item") },
+                    singleLine = true,
+                )
+                TextButton(
+                    onClick = {
+                        if (newCheck.isNotBlank()) {
+                            onChecklist(
+                                Checklist.format(
+                                    checks + com.secondmemory.app.domain.CheckItem(newCheck.trim(), false),
+                                ),
+                            )
+                            newCheck = ""
+                        }
+                    },
+                ) { Text("Add") }
+            }
+            Text("Colour", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp))
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PinStyle.colors.forEach { color ->
+                    FilterChip(
+                        selected = thing.pinColor == color,
+                        onClick = { onColor(color) },
+                        label = { Text(PinStyle.label(color)) },
+                    )
+                }
+            }
+            Text("Priority", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Priority.entries.forEach { p ->
+                    FilterChip(
+                        selected = thing.priority == p,
+                        onClick = { onPriority(p) },
+                        label = { Text(p.name.lowercase().replaceFirstChar { it.titlecase() }) },
+                    )
+                }
             }
 
             OutlinedTextField(
                 value = notes,
-                onValueChange = { notes = it; onNotes(it) },
+                onValueChange = { notes = it },
                 modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
                 label = { Text("Notes") },
                 minLines = 3,
@@ -262,6 +339,19 @@ fun DetailScreen(
                 Spacer(Modifier.height(24.dp))
             }
         }
+    }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Delete this?") },
+            text = { Text("It will be removed from this phone.") },
+            confirmButton = {
+                TextButton(onClick = { confirmDelete = false; onDelete() }) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) { Text("Cancel") }
+            },
+        )
     }
 }
 

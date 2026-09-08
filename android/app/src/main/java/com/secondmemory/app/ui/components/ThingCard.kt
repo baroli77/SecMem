@@ -260,7 +260,7 @@ fun ThingCard(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            "Unpin",
+                            if (thing.isPinned || thing.isFavourite) "Unpin" else "Pin",
                             color = ForestOn,
                             fontWeight = FontWeight.Medium,
                             modifier = Modifier.padding(end = 8.dp),

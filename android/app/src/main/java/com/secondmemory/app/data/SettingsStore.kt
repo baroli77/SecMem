@@ -38,6 +38,8 @@ class SettingsStore(private val context: Context) {
             prefs[Keys.isPro] = next.isPro
             prefs[Keys.nudgesOn] = next.nudgesOn
             prefs[Keys.nudgesToday] = next.nudgesToday
+            prefs[Keys.lockScreenPrivate] = next.lockScreenPrivate
+            prefs[Keys.pinExpiryHours] = next.pinExpiryHours
         }
     }
 
@@ -60,6 +62,8 @@ class SettingsStore(private val context: Context) {
         val isPro = booleanPreferencesKey("isPro")
         val nudgesOn = stringPreferencesKey("nudgesOn")
         val nudgesToday = intPreferencesKey("nudgesToday")
+        val lockScreenPrivate = booleanPreferencesKey("lockScreenPrivate")
+        val pinExpiryHours = intPreferencesKey("pinExpiryHours")
     }
 
     private fun Preferences.toSettings(): Settings {
@@ -68,7 +72,7 @@ class SettingsStore(private val context: Context) {
             appearance = runCatching { Appearance.valueOf(appearanceName) }.getOrDefault(Appearance.SYSTEM),
             aiEnabled = this[Keys.aiEnabled] ?: true,
             automaticProcessing = this[Keys.automaticProcessing] ?: true,
-            resurfaceEnabled = this[Keys.resurfaceEnabled] ?: true,
+            resurfaceEnabled = this[Keys.resurfaceEnabled] ?: false,
             maxNudgesPerDay = this[Keys.maxNudgesPerDay] ?: 5,
             quietHoursStart = this[Keys.quietHoursStart] ?: "22:00",
             quietHoursEnd = this[Keys.quietHoursEnd] ?: "07:00",
@@ -83,6 +87,8 @@ class SettingsStore(private val context: Context) {
             isPro = this[Keys.isPro] ?: false,
             nudgesOn = this[Keys.nudgesOn] ?: "",
             nudgesToday = this[Keys.nudgesToday] ?: 0,
+            lockScreenPrivate = this[Keys.lockScreenPrivate] ?: true,
+            pinExpiryHours = this[Keys.pinExpiryHours] ?: 0,
         )
     }
 }
