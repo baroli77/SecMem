@@ -54,6 +54,7 @@ import com.secondmemory.app.domain.PinStyle
 import com.secondmemory.app.domain.Resurface
 import com.secondmemory.app.domain.Settings
 import com.secondmemory.app.domain.Thing
+import com.secondmemory.app.domain.canOpenExternally
 import com.secondmemory.app.ui.components.hostOf
 import com.secondmemory.app.ui.components.relativeAge
 import java.io.File
@@ -164,11 +165,13 @@ fun DetailScreen(
 
             Spacer(Modifier.height(20.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = { NotificationHelperOpen(context, thing) },
-                ) {
-                    Icon(Icons.Outlined.OpenInNew, contentDescription = null, modifier = Modifier.padding(end = 6.dp))
-                    Text("Open")
+                if (thing.canOpenExternally()) {
+                    Button(
+                        onClick = { NotificationHelperOpen(context, thing) },
+                    ) {
+                        Icon(Icons.Outlined.OpenInNew, contentDescription = null, modifier = Modifier.padding(end = 6.dp))
+                        Text("Open")
+                    }
                 }
                 OutlinedButton(onClick = onPin) { Text(if (pinned) "Unpin" else "Pin") }
                 if (pinned) {
@@ -242,12 +245,13 @@ fun DetailScreen(
                     }
                 }
                 Text("Expires", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val now = System.currentTimeMillis()
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(selected = thing.expiresAt == null, onClick = { onExpires(null) }, label = { Text("Never") })
                     listOf(24 to "1 day", 168 to "1 week").forEach { (h, label) ->
                         FilterChip(
-                            selected = false,
-                            onClick = { onExpires(System.currentTimeMillis() + h * 3600_000L) },
+                            selected = expiryMatches(thing.expiresAt, h, now),
+                            onClick = { onExpires(now + h * 3600_000L) },
                             label = { Text(label) },
                         )
                     }
@@ -286,4 +290,10 @@ private fun displayBody(thing: Thing): String? {
     )
     if (stripped.isEmpty() || stripped == title) return null
     return stripped
+}
+
+private fun expiryMatches(expiresAt: Long?, hours: Int, now: Long): Boolean {
+    val at = expiresAt ?: return false
+    val remainingH = (at - now) / 3_600_000.0
+    return remainingH in (hours * 0.55)..(hours * 1.45)
 }

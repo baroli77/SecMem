@@ -245,14 +245,23 @@ class MemoryRepository(
 
     suspend fun keep(id: String) = setPinned(id, true)
 
-    suspend fun remove(id: String) {
+    suspend fun detach(id: String): Thing? {
         val existing = write.withLock {
             val row = dao.getThing(id)?.toDomain()
             dao.delete(id)
             row
         }
-        CaptureFiles.delete(existing?.imageUri)
         if (existing != null) log("deleted", existing)
+        return existing
+    }
+
+    suspend fun reinsert(thing: Thing) = write.withLock {
+        dao.upsert(thing.toEntity())
+    }
+
+    suspend fun remove(id: String) {
+        val existing = detach(id)
+        CaptureFiles.delete(existing?.imageUri)
     }
 
     suspend fun togglePin(id: String): Thing? {

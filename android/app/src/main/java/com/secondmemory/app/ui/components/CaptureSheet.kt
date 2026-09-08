@@ -11,7 +11,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -56,21 +55,7 @@ fun CaptureSheet(
                 enabled = text.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Save")
-            }
-            TextButton(
-                onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Skip for now")
-            }
-            TextButton(
-                onClick = {
-                    text = "Don't forget to send Sarah the spreadsheet tomorrow."
-                },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Use a sample reminder")
+                Text("Pin")
             }
         }
     }

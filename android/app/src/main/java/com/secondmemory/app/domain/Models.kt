@@ -170,3 +170,9 @@ fun thingActionVerb(thing: Thing): String = when (thing.category) {
     Category.EVENT -> "Done"
     else -> "Done"
 }
+
+fun Thing.canOpenExternally(): Boolean {
+    val url = sourceUrl?.trim().orEmpty()
+    if (url.startsWith("https://") || url.startsWith("http://") || url.startsWith("geo:")) return true
+    return !imageUri.isNullOrBlank() && java.io.File(imageUri).exists()
+}

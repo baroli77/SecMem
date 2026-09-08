@@ -1,4 +1,7 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.foundation.layout.ExperimentalLayoutApi::class,
+)
 
 package com.secondmemory.app.ui.screens
 
@@ -8,6 +11,8 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.secondmemory.app.data.Backup
 import com.secondmemory.app.domain.Appearance
 import com.secondmemory.app.domain.Settings
 import com.secondmemory.app.notify.NotificationHelper
@@ -51,6 +57,10 @@ fun SettingsScreen(
     var password by remember { mutableStateOf("") }
     var confirmReset by remember { mutableStateOf(false) }
     var pendingAction by remember { mutableStateOf<String?>(null) }
+    var pendingUri by remember { mutableStateOf<Uri?>(null) }
+    var restorePassword by remember { mutableStateOf("") }
+    var needPassword by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
         if (uri != null) onExport(uri, password.takeIf { encrypt && it.isNotBlank() })
         encrypt = false
@@ -58,18 +68,22 @@ fun SettingsScreen(
         pendingAction = null
     }
     val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) onImport(uri, password.takeIf { it.isNotBlank() })
-        password = ""
-        pendingAction = null
+        if (uri == null) return@rememberLauncherForActivityResult
+        val bytes = runCatching { Backup.read(context, uri) }.getOrNull()
+        if (bytes != null && Backup.isEncrypted(bytes)) {
+            pendingUri = uri
+            restorePassword = ""
+            needPassword = true
+        } else if (uri != null) {
+            onImport(uri, null)
+        }
     }
-    val context = LocalContext.current
     Column(
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 12.dp),
     ) {
-        Text("Settings", style = MaterialTheme.typography.headlineLarge)
         Text(
             "Share it. It stays in the shade until you unpin it.",
             style = MaterialTheme.typography.bodyMedium,
@@ -119,13 +133,12 @@ fun SettingsScreen(
                 onPatch { s -> s.copy(automaticProcessing = it) }
             }
             Label("Auto-expire pins")
-            Row {
+            FlowRow(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
                 listOf(0 to "Never", 24 to "1 day", 72 to "3 days", 168 to "1 week").forEach { (hours, label) ->
                     FilterChip(
                         selected = settings.pinExpiryHours == hours,
                         onClick = { onPatch { it.copy(pinExpiryHours = hours) } },
                         label = { Text(label) },
-                        modifier = Modifier.padding(end = 8.dp),
                     )
                 }
             }
@@ -145,6 +158,39 @@ fun SettingsScreen(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 28.dp, bottom = 32.dp),
+        )
+    }
+    if (needPassword) {
+        AlertDialog(
+            onDismissRequest = { needPassword = false; pendingUri = null; restorePassword = "" },
+            title = { Text("Encrypted backup") },
+            text = {
+                Column {
+                    Text("This backup is encrypted. Enter the passphrase to restore it.")
+                    OutlinedTextField(
+                        value = restorePassword,
+                        onValueChange = { restorePassword = it },
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                        label = { Text("Passphrase") },
+                        singleLine = true,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val uri = pendingUri
+                        needPassword = false
+                        pendingUri = null
+                        if (uri != null) onImport(uri, restorePassword)
+                        restorePassword = ""
+                    },
+                    enabled = restorePassword.length >= 4,
+                ) { Text("Restore") }
+            },
+            dismissButton = {
+                TextButton(onClick = { needPassword = false; pendingUri = null; restorePassword = "" }) { Text("Cancel") }
+            },
         )
     }
     if (pendingAction == "encrypt") {

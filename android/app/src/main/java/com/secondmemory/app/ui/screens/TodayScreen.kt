@@ -23,6 +23,7 @@ fun TodayScreen(
     things: List<Thing>,
     settings: Settings,
     onOpen: (String) -> Unit,
+    onOpenContent: (String) -> Unit,
     onSnooze: (String, Long) -> Unit,
     onDelete: (String) -> Unit,
     onPin: (String) -> Unit,
@@ -53,6 +54,7 @@ fun TodayScreen(
             ThingCard(
                 thing = thing,
                 onOpen = { onOpen(thing.id) },
+                onOpenContent = { onOpenContent(thing.id) },
                 onSnooze = { onSnooze(thing.id, it) },
                 onDelete = { onDelete(thing.id) },
                 onPin = { onPin(thing.id) },

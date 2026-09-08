@@ -97,6 +97,25 @@ fun SecondMemoryAppUi(
             }
         }
 
+        fun deleteWithUndo(id: String) {
+            vm.detach(id)
+            scope.launch {
+                val result = snackbar.showSnackbar(
+                    message = "Deleted",
+                    actionLabel = "Undo",
+                    duration = SnackbarDuration.Short,
+                )
+                if (result == SnackbarResult.ActionPerformed) vm.undoDetach(id) else vm.purgeDetach(id)
+            }
+        }
+
+        fun openContent(id: String) {
+            things.firstOrNull { it.id == id }?.let { thing ->
+                NotificationHelper.openThing(context, thing)
+                vm.openThing(id)
+            }
+        }
+
         fun pinToToday(id: String) {
             val thing = things.firstOrNull { it.id == id }
             val turningOn = thing != null && !thing.isPinned
@@ -221,7 +240,7 @@ fun SecondMemoryAppUi(
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary,
                     ) {
-                        Icon(Icons.Outlined.Add, contentDescription = "Save")
+                        Icon(Icons.Outlined.Add, contentDescription = "Pin something")
                     }
                 }
             },
@@ -236,11 +255,9 @@ fun SecondMemoryAppUi(
                         things = things,
                         settings = settings,
                         onOpen = { nav.navigate("thing/$it") },
+                        onOpenContent = ::openContent,
                         onSnooze = vm::snooze,
-                        onDelete = { id ->
-                            vm.remove(id)
-                            scope.launch { snackbar.showSnackbar("Deleted") }
-                        },
+                        onDelete = ::deleteWithUndo,
                         onPin = ::pinToToday,
                     )
                 }
@@ -249,11 +266,9 @@ fun SecondMemoryAppUi(
                         things = things,
                         settings = settings,
                         onOpen = { nav.navigate("thing/$it") },
+                        onOpenContent = ::openContent,
                         onSnooze = vm::snooze,
-                        onDelete = { id ->
-                            vm.remove(id)
-                            scope.launch { snackbar.showSnackbar("Deleted") }
-                        },
+                        onDelete = ::deleteWithUndo,
                         onPin = ::pinToToday,
                     )
                 }
@@ -322,7 +337,7 @@ fun SecondMemoryAppUi(
                     showNotifPrompt = false
                     vm.patchSettings { it.copy(notificationsAsked = true) }
                 },
-                title = { Text("Stay in the shade?") },
+                title = { Text("Allow notification pins") },
                 text = {
                     Text(
                         "Pinned things sit in your notification shade until you unpin them. " +

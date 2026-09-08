@@ -91,8 +91,15 @@ object Backup {
         return encrypt(plain, password)
     }
 
+    fun isEncrypted(bytes: ByteArray): Boolean {
+        val magic = MAGIC.toByteArray()
+        return bytes.size > magic.size && bytes.copyOfRange(0, magic.size).contentEquals(magic)
+    }
+
     fun unpack(bytes: ByteArray, password: String?): Pair<JSONObject, Map<String, ByteArray>> {
-        val zipBytes = if (password.isNullOrBlank()) bytes else decrypt(bytes, password)
+        val encrypted = isEncrypted(bytes)
+        if (encrypted && password.isNullOrBlank()) error("This backup is encrypted")
+        val zipBytes = if (encrypted) decrypt(bytes, password!!) else bytes
         val files = mutableMapOf<String, ByteArray>()
         var snapshot = JSONObject()
         ZipInputStream(zipBytes.inputStream()).use { zip ->

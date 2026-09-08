@@ -39,12 +39,14 @@ import coil.compose.AsyncImage
 import com.secondmemory.app.domain.ContentType
 import com.secondmemory.app.domain.SnoozeOption
 import com.secondmemory.app.domain.Thing
+import com.secondmemory.app.domain.canOpenExternally
 import java.io.File
 
 @Composable
 fun ThingCard(
     thing: Thing,
     onOpen: () -> Unit,
+    onOpenContent: () -> Unit,
     onSnooze: (Long) -> Unit,
     onDelete: () -> Unit,
     onPin: () -> Unit,
@@ -114,7 +116,9 @@ fun ThingCard(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = onOpen) { Text("Open") }
+                if (thing.canOpenExternally()) {
+                    TextButton(onClick = onOpenContent) { Text("Open") }
+                }
                 if (pinned) {
                     Box {
                         TextButton(onClick = { later = true }) { Text("Later") }

@@ -53,7 +53,7 @@ fun OnboardingScreen(onFinished: () -> Unit) {
             onClick = onFinished,
             modifier = Modifier.heightIn(min = 52.dp),
         ) {
-            Text("Continue")
+            Text("Get started")
         }
         Spacer(Modifier.weight(0.6f))
     }

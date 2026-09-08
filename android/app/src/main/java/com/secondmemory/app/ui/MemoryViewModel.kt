@@ -58,7 +58,22 @@ class MemoryViewModel(private val repo: MemoryRepository) : ViewModel() {
     fun restore(id: String) = viewModelScope.launch { repo.restore(id) }
     fun snooze(id: String, until: Long) = viewModelScope.launch { repo.snooze(id, until) }
     fun keep(id: String) = viewModelScope.launch { repo.keep(id) }
+    private val detached = mutableMapOf<String, Thing>()
+
     fun remove(id: String) = viewModelScope.launch { repo.remove(id) }
+
+    fun detach(id: String) = viewModelScope.launch {
+        repo.detach(id)?.let { detached[id] = it }
+    }
+
+    fun undoDetach(id: String) = viewModelScope.launch {
+        detached.remove(id)?.let { repo.reinsert(it) }
+    }
+
+    fun purgeDetach(id: String) = viewModelScope.launch {
+        val gone = detached.remove(id) ?: return@launch
+        com.secondmemory.app.data.CaptureFiles.delete(gone.imageUri)
+    }
     fun togglePin(id: String) = viewModelScope.launch { repo.togglePin(id) }
     fun openThing(id: String) = viewModelScope.launch { repo.openThing(id) }
     fun updateNotes(id: String, notes: String) = viewModelScope.launch { repo.updateNotes(id, notes) }
@@ -102,7 +117,16 @@ class MemoryViewModel(private val repo: MemoryRepository) : ViewModel() {
             repo.importSnapshot(json, files)
             ShadeSync.refresh(context, repo)
         }.onSuccess { onDone(true, "Restored") }
-            .onFailure { onDone(false, if (it.message?.contains("pass", true) == true || it.message?.contains("Wrong") == true) "Wrong passphrase" else (it.message ?: "Couldn’t restore")) }
+            .onFailure {
+                val msg = when {
+                    it.message?.contains("encrypted", true) == true -> "This backup is encrypted"
+                    it.message?.contains("Wrong", true) == true ||
+                        it.cause is javax.crypto.AEADBadTagException ||
+                        it is javax.crypto.AEADBadTagException -> "Wrong passphrase"
+                    else -> it.message ?: "Couldn’t restore"
+                }
+                onDone(false, msg)
+            }
     }
 
     fun inbox(things: List<Thing>) = things.filter { it.status == ThingStatus.INBOX }

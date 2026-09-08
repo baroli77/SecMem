@@ -30,6 +30,7 @@ fun LibraryScreen(
     things: List<Thing>,
     settings: Settings,
     onOpen: (String) -> Unit,
+    onOpenContent: (String) -> Unit,
     onSnooze: (String, Long) -> Unit,
     onDelete: (String) -> Unit,
     onPin: (String) -> Unit,
@@ -67,7 +68,7 @@ fun LibraryScreen(
             if (saved.isEmpty()) {
                 item {
                     Text(
-                        if (q.isEmpty()) "Unpinned things live here." else "No matches.",
+                        if (q.isEmpty()) "Things you unpin are kept here." else "No matches.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 12.dp),
@@ -78,6 +79,7 @@ fun LibraryScreen(
                 ThingCard(
                     thing = thing,
                     onOpen = { onOpen(thing.id) },
+                    onOpenContent = { onOpenContent(thing.id) },
                     onSnooze = { onSnooze(thing.id, it) },
                     onDelete = { onDelete(thing.id) },
                     onPin = { onPin(thing.id) },
