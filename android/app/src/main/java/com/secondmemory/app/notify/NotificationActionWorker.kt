@@ -21,7 +21,7 @@ class NotificationActionWorker(
         val repo = app.container.repository
         when (action) {
             NotificationHelper.ACTION_DONE -> repo.complete(id)
-            NotificationHelper.ACTION_UNPIN -> repo.setPinned(id, false)
+            NotificationHelper.ACTION_UNPIN, NotificationHelper.ACTION_DISMISS -> repo.setPinned(id, false)
             NotificationHelper.ACTION_PIN -> repo.setPinned(id, true)
             NotificationHelper.ACTION_LATER -> {
                 val until = Resurface.snoozeOptions(Calendar.getInstance()).firstOrNull { it.id == "tonight" }?.at

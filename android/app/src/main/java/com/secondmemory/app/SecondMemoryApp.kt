@@ -38,7 +38,7 @@ class SecondMemoryApp : Application() {
             container.repository.assignMissingNotifIds()
             container.repository.pruneCaptureFiles()
             val things = container.repository.currentThings()
-            NotificationHelper.refreshPins(this@SecondMemoryApp, things)
+            NotificationHelper.refreshPins(this@SecondMemoryApp, things, restoreMissing = true)
             ReminderScheduler.scheduleNext(this@SecondMemoryApp, things)
         }
     }

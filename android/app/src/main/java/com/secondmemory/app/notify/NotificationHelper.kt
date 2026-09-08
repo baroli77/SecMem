@@ -27,11 +27,13 @@ object NotificationHelper {
     const val ACTION_UNPIN = "com.secondmemory.app.UNPIN"
     const val ACTION_OPEN = "com.secondmemory.app.OPEN"
     const val ACTION_PIN = "com.secondmemory.app.PIN"
+    const val ACTION_DISMISS = "com.secondmemory.app.DISMISS"
     const val EXTRA_THING_ID = "thingId"
     private const val GROUP = "pinned"
     private const val SUMMARY_ID = 1
     private const val WELCOME_ID = 2
     private const val PIN_LIMIT = 12
+    private const val REPOST_WINDOW_MS = 20_000L
 
     fun isPinned(thing: Thing): Boolean = thing.isPinned || thing.isFavourite
 
@@ -59,7 +61,7 @@ object NotificationHelper {
         }
     }
 
-    fun refreshPins(context: Context, things: List<Thing>) {
+    fun refreshPins(context: Context, things: List<Thing>, restoreMissing: Boolean = false) {
         ensureChannel(context)
         val nm = NotificationManagerCompat.from(context)
         if (!nm.areNotificationsEnabled()) {
@@ -71,9 +73,20 @@ object NotificationHelper {
         }.sortedByDescending { it.updatedAt }
         val visible = pins.take(PIN_LIMIT)
         val wanted = visible.map { pinId(it) }.toSet() + setOf(SUMMARY_ID)
-        activeIds(context).filter { it !in wanted && it != WELCOME_ID }.forEach { nm.cancel(it) }
-        visible.forEachIndexed { index, thing -> showPin(context, thing, withThumb = index < 3) }
-        if (pins.isEmpty()) nm.cancel(SUMMARY_ID) else showSummary(context, pins)
+        val active = activeIds(context).toSet()
+        active.filter { it !in wanted && it != WELCOME_ID }.forEach { nm.cancel(it) }
+        val now = System.currentTimeMillis()
+        var showing = 0
+        visible.forEachIndexed { index, thing ->
+            val id = pinId(thing)
+            val wasShowing = id in active
+            val justPinned = now - thing.updatedAt < REPOST_WINDOW_MS
+            if (wasShowing || restoreMissing || justPinned) {
+                showPin(context, thing, withThumb = index < 3)
+                showing += 1
+            }
+        }
+        if (showing == 0) nm.cancel(SUMMARY_ID) else showSummary(context, visible)
     }
 
     fun clear(context: Context) {
@@ -187,12 +200,14 @@ object NotificationHelper {
         val openPi = openPending(context, thing)
         val donePi = actionPi(context, ACTION_DONE, thing.id, requestCode(thing, 3))
         val laterPi = actionPi(context, ACTION_LATER, thing.id, requestCode(thing, 4))
+        val unpinPi = actionPi(context, ACTION_UNPIN, thing.id, requestCode(thing, 8))
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_memory)
             .setContentTitle(thing.title)
             .setContentText(pinSubtitle(thing))
             .setStyle(NotificationCompat.BigTextStyle().bigText(pinBody(thing)))
             .setContentIntent(openPi)
+            .setDeleteIntent(unpinPi)
             .setOngoing(true)
             .setAutoCancel(false)
             .setOnlyAlertOnce(true)
@@ -202,7 +217,7 @@ object NotificationHelper {
             .setSortKey(thing.createdAt.toString())
             .addAction(0, thingActionVerb(thing), donePi)
             .addAction(0, context.getString(R.string.notif_later), laterPi)
-            .addAction(0, context.getString(R.string.notif_open), openPi)
+            .addAction(0, context.getString(R.string.notif_unpin), unpinPi)
             .setColor(0xFF2C5C4F.toInt())
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)

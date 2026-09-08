@@ -207,7 +207,9 @@ class MemoryRepository(
     suspend fun setPinned(id: String, pinned: Boolean) = patch(id) {
         it.copy(
             isPinned = pinned,
-            isFavourite = if (pinned) false else it.isFavourite,
+            isFavourite = false,
+            resurfaceAt = if (pinned) null else it.resurfaceAt?.takeIf { at -> at > System.currentTimeMillis() },
+            reasonForResurface = if (pinned) null else it.reasonForResurface,
             status = if (pinned && (it.status == ThingStatus.COMPLETED || it.status == ThingStatus.ARCHIVED)) {
                 ThingStatus.ACTIVE
             } else {
@@ -222,6 +224,7 @@ class MemoryRepository(
         it.copy(
             status = ThingStatus.ACTIVE,
             isPinned = false,
+            isFavourite = false,
             completedAt = null,
             archivedAt = null,
             resurfaceAt = until,

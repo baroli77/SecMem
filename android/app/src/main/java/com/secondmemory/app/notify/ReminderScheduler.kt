@@ -78,7 +78,7 @@ class BootReceiver : BroadcastReceiver() {
         app.container.scope.launch {
             try {
                 val things = app.container.repository.currentThings()
-                NotificationHelper.refreshPins(context, things)
+                NotificationHelper.refreshPins(context, things, restoreMissing = true)
                 ReminderScheduler.scheduleNext(context, things)
             } finally {
                 pending.finish()

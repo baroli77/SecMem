@@ -67,7 +67,6 @@ object Seed {
                 resurfaceAt = now - 40 * 60_000L,
                 lastResurfacedAt = now - 40 * 60_000L,
                 resurfaceCount = 1,
-                isFavourite = true,
                 aiProcessed = true,
                 aiConfidence = 0.88f,
                 processingStatus = ProcessingStatus.COMPLETE,
