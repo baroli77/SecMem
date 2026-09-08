@@ -60,7 +60,6 @@ class MemoryViewModel(private val repo: MemoryRepository) : ViewModel() {
     fun keep(id: String) = viewModelScope.launch { repo.keep(id) }
     fun remove(id: String) = viewModelScope.launch { repo.remove(id) }
     fun togglePin(id: String) = viewModelScope.launch { repo.togglePin(id) }
-    fun toggleFavourite(id: String) = viewModelScope.launch { repo.toggleFavourite(id) }
     fun openThing(id: String) = viewModelScope.launch { repo.openThing(id) }
     fun updateNotes(id: String, notes: String) = viewModelScope.launch { repo.updateNotes(id, notes) }
     fun updateTitle(id: String, title: String) = viewModelScope.launch { repo.updateTitle(id, title) }

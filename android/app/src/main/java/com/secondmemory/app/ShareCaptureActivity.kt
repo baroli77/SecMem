@@ -58,10 +58,6 @@ class ShareCaptureActivity : ComponentActivity() {
         for (input in inputs) {
             val result = app.container.repository.capture(input.copy(imageUri = null))
             var saved = result.saved
-            if (result.blocked) {
-                lastMessage = "Free limit reached — upgrade in Settings"
-                continue
-            }
             if (result.duplicate != null) {
                 lastMessage = "Already saved: ${result.duplicate.title}"
                 if (saved != null) NotificationHelper.showJustSaved(this, saved)

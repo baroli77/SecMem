@@ -4,7 +4,6 @@ import com.secondmemory.app.domain.ActivityEvent
 import com.secondmemory.app.domain.CaptureInput
 import com.secondmemory.app.domain.CaptureResult
 import com.secondmemory.app.domain.Category
-import com.secondmemory.app.domain.FREE_ACTIVE_LIMIT
 import com.secondmemory.app.domain.Heuristics
 import com.secondmemory.app.domain.PinStyle
 import com.secondmemory.app.domain.Priority
@@ -260,10 +259,6 @@ class MemoryRepository(
         val existing = dao.getThing(id)?.toDomain() ?: return null
         val currently = existing.isPinned
         return setPinned(id, !currently)
-    }
-
-    suspend fun toggleFavourite(id: String) = patch(id) { it.copy(isFavourite = !it.isFavourite) }.also {
-        if (it?.isFavourite == true) log("favourited", it)
     }
 
     suspend fun openThing(id: String) = patch(id) {

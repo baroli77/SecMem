@@ -150,7 +150,7 @@ object Resurface {
             }
             Category.PERSONAL -> nextOccurrence(now, settings.leisureTime).timeInMillis to "Personal time"
             else -> {
-                val days = if (thing.isPinned || thing.isFavourite) 2 else 4
+                val days = if (thing.isPinned) 2 else 4
                 val d = atTime(now, settings.readingTime)
                 d.add(Calendar.DAY_OF_YEAR, days)
                 d.timeInMillis to "A later reminder"
@@ -244,7 +244,7 @@ object Resurface {
         val stillIds = stillWant.map { it.id }.toSet()
         val suggested = open.filter {
             it.id !in dueIds && it.id !in resurfacedIds && it.id !in laterIds && it.id !in stillIds &&
-                (it.isPinned || it.isFavourite)
+                it.isPinned
         }.sortedWith(compareByDescending<Thing> { it.isPinned }.thenByDescending { it.updatedAt }).take(4)
 
         return TodayBuckets(due, resurfaced, laterToday, suggested, stillWant)

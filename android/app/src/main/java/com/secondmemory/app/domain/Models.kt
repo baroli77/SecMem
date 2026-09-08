@@ -109,9 +109,8 @@ data class CaptureInput(
 data class CaptureResult(
     val thing: Thing? = null,
     val duplicate: Thing? = null,
-    val blocked: Boolean = false,
 ) {
-    val saved: Thing? get() = if (blocked) null else thing
+    val saved: Thing? get() = thing
 }
 
 data class ParsedCapture(
@@ -139,11 +138,6 @@ data class UrlMetadata(
     val siteName: String? = null,
     val canonicalUrl: String? = null,
 )
-
-const val FREE_ACTIVE_LIMIT = 40
-
-fun activeCount(things: List<Thing>): Int =
-    things.count { it.status == ThingStatus.INBOX || it.status == ThingStatus.ACTIVE }
 
 fun categoryLabel(category: Category): String = when (category) {
     Category.READ -> "Read"
