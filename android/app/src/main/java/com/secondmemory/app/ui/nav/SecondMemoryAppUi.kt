@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.List
 import androidx.compose.material.icons.outlined.Notifications
@@ -164,11 +165,24 @@ fun SecondMemoryAppUi(
             return@SecondMemoryTheme
         }
 
+        val onTabs = route == "today" || route == "library"
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             snackbarHost = { SnackbarHost(snackbar) },
             topBar = {
-                if (route != "onboarding" && route?.startsWith("thing/") != true) {
+                if (route == "settings") {
+                    androidx.compose.material3.TopAppBar(
+                        title = { Text("Settings", style = MaterialTheme.typography.titleLarge) },
+                        navigationIcon = {
+                            IconButton(onClick = { nav.popBackStack() }) {
+                                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                            }
+                        },
+                        colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.background,
+                        ),
+                    )
+                } else if (onTabs) {
                     androidx.compose.material3.TopAppBar(
                         title = { Text("Second Memory", style = MaterialTheme.typography.titleLarge) },
                         actions = {
@@ -183,7 +197,7 @@ fun SecondMemoryAppUi(
                 }
             },
             bottomBar = {
-                if (route != "onboarding" && route?.startsWith("thing/") != true) {
+                if (onTabs) {
                     NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                         NavigationBarItem(
                             selected = route == "today",
@@ -201,7 +215,7 @@ fun SecondMemoryAppUi(
                 }
             },
             floatingActionButton = {
-                if (route != "onboarding" && route?.startsWith("thing/") != true) {
+                if (onTabs) {
                     FloatingActionButton(
                         onClick = { captureOpen = true },
                         containerColor = MaterialTheme.colorScheme.primary,
@@ -337,6 +351,8 @@ fun SecondMemoryAppUi(
 }
 
 private fun androidx.navigation.NavHostController.tab(route: String) {
+    if (currentDestination?.route == "settings") popBackStack()
+    if (currentDestination?.route == route) return
     navigate(route) {
         popUpTo(graph.findStartDestination().id) { saveState = true }
         launchSingleTop = true
