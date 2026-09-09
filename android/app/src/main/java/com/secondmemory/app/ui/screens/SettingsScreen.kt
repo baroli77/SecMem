@@ -142,6 +142,12 @@ fun SettingsScreen(
                     )
                 }
             }
+            Text(
+                "Applies to new pins only. Pins already in the shade are unchanged.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp),
+            )
             TextButton(onClick = onLoadExamples) { Text("Load example things") }
             TextButton(onClick = { NotificationHelper.showWelcome(context) }) { Text("Send a test pin") }
             Text(
