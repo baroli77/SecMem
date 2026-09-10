@@ -1,5 +1,7 @@
 # Privacy Policy — Second Memory
 
+Canonical URL: [https://rentclock.com/second-memory/privacy](https://rentclock.com/second-memory/privacy)
+
 Last updated: 10 September 2026
 
 Second Memory is a local-first Android app. **Pay once. No ads. No subscription.**

@@ -6,6 +6,7 @@
 package com.secondmemory.app.ui.screens
 
 import android.Manifest
+import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -182,8 +183,18 @@ fun SettingsScreen(
             "Everything stays on this phone. Backups you export stay under your control. Package com.secondmemory.app",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 8.dp, bottom = 32.dp),
+            modifier = Modifier.padding(top = 8.dp),
         )
+        TextButton(
+            onClick = {
+                runCatching {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse("https://rentclock.com/second-memory/privacy")),
+                    )
+                }
+            },
+            modifier = Modifier.padding(bottom = 32.dp),
+        ) { Text("Privacy policy") }
     }
     if (needPassword) {
         AlertDialog(

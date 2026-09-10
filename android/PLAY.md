@@ -8,7 +8,7 @@
 |---|---|
 | App name | Second Memory |
 | Package | `com.secondmemory.app` — do not rename |
-| Version | **1.0.0** (`versionCode` 17) |
+| Version | **1.0.0** (`versionCode` 18) |
 | Price | **£3.99** one-time, UK store default |
 | Model | Paid app. No IAP. No ads. No subscription. |
 | Tagline | Pay once. No ads. No subscription. |
@@ -42,9 +42,7 @@ Everything lives on your phone. Optional encrypted backup. No account.
 
 **Privacy policy URL** (required because the app uses INTERNET)
 
-https://github.com/baroli77/SecMem/blob/main/android/PRIVACY.md
-
-Make the GitHub repo **public** before review, or host that file on any public HTTPS page.
+https://rentclock.com/second-memory/privacy
 
 ## Data safety form
 
