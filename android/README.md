@@ -1,13 +1,20 @@
 # Second Memory for Android
 
-Native Kotlin + Jetpack Compose app.
+v1.0 is frozen. Package `com.secondmemory.app`. Target API 36.
 
-- Package: `com.secondmemory.app`
-- Min SDK 26 / target SDK 35
-- Local-first Room storage
-- Android share sheet capture (text, URLs, images)
-- Today / Inbox / Library
-- Heuristic understanding + Open Graph enrichment
-- Conservative resurfacing notifications (Done / Later / Open)
+Pay once. No ads. No subscription.
 
-Release APK is signed and copied to `/workspace/artifacts/SecondMemory.apk`.
+Share a link, photo or note. It stays in the notification shade until you unpin it.
+
+- Min SDK 26 / target SDK 36
+- Local-first Room
+- Share sheet (`*/*`)
+- Pins, Later, Saved
+- Optional encrypted backup
+- Home-screen widget and Quick Settings tile
+
+See [PLAY.md](PLAY.md) for the Play Console listing and [PRIVACY.md](PRIVACY.md) for the privacy policy.
+
+```
+./gradlew :app:bundleRelease
+```

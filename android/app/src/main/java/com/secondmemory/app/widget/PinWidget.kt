@@ -45,7 +45,7 @@ class PinWidget : AppWidgetProvider() {
             )
             return RemoteViews(context.packageName, R.layout.pin_widget).apply {
                 setTextViewText(R.id.widget_count, count.toString())
-                setTextViewText(R.id.widget_label, if (count == 1) "pinned" else "pinned")
+                setTextViewText(R.id.widget_label, if (count == 1) "pin" else "pins")
                 setOnClickPendingIntent(R.id.widget_root, open)
             }
         }

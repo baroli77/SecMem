@@ -35,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.secondmemory.app.BuildConfig
 import com.secondmemory.app.data.Backup
 import com.secondmemory.app.domain.Appearance
 import com.secondmemory.app.domain.Settings
@@ -89,6 +90,13 @@ fun SettingsScreen(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp, bottom = 20.dp),
+        )
+
+        Label("How it works")
+        Text(
+            "Share a link, photo or note to Second Memory. It stays in your notification shade until you unpin it. Later snoozes it. Unpinning keeps it in Saved.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         Label("Appearance")
@@ -160,10 +168,21 @@ fun SettingsScreen(
         }
 
         Text(
-            "Second Memory",
+            "Second Memory ${BuildConfig.VERSION_NAME}",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(top = 28.dp),
+        )
+        Text(
+            "Pay once. No ads. No subscription.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        Text(
+            "Everything stays on this phone. Backups you export stay under your control. Package com.secondmemory.app",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 28.dp, bottom = 32.dp),
+            modifier = Modifier.padding(top = 8.dp, bottom = 32.dp),
         )
     }
     if (needPassword) {

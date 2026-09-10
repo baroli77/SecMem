@@ -88,7 +88,6 @@ data class Settings(
     val notificationsEnabled: Boolean = false,
     val notificationsAsked: Boolean = false,
     val onboardingComplete: Boolean = false,
-    val isPro: Boolean = false,
     val nudgesOn: String = "",
     val nudgesToday: Int = 0,
     val lockScreenPrivate: Boolean = true,

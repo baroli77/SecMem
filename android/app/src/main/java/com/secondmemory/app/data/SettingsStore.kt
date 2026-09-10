@@ -35,7 +35,6 @@ class SettingsStore(private val context: Context) {
             prefs[Keys.notificationsEnabled] = next.notificationsEnabled
             prefs[Keys.notificationsAsked] = next.notificationsAsked
             prefs[Keys.onboardingComplete] = next.onboardingComplete
-            prefs[Keys.isPro] = next.isPro
             prefs[Keys.nudgesOn] = next.nudgesOn
             prefs[Keys.nudgesToday] = next.nudgesToday
             prefs[Keys.lockScreenPrivate] = next.lockScreenPrivate
@@ -59,7 +58,6 @@ class SettingsStore(private val context: Context) {
         val notificationsEnabled = booleanPreferencesKey("notificationsEnabled")
         val notificationsAsked = booleanPreferencesKey("notificationsAsked")
         val onboardingComplete = booleanPreferencesKey("onboardingComplete")
-        val isPro = booleanPreferencesKey("isPro")
         val nudgesOn = stringPreferencesKey("nudgesOn")
         val nudgesToday = intPreferencesKey("nudgesToday")
         val lockScreenPrivate = booleanPreferencesKey("lockScreenPrivate")
@@ -84,7 +82,6 @@ class SettingsStore(private val context: Context) {
             notificationsEnabled = this[Keys.notificationsEnabled] ?: false,
             notificationsAsked = this[Keys.notificationsAsked] ?: false,
             onboardingComplete = this[Keys.onboardingComplete] ?: false,
-            isPro = this[Keys.isPro] ?: false,
             nudgesOn = this[Keys.nudgesOn] ?: "",
             nudgesToday = this[Keys.nudgesToday] ?: 0,
             lockScreenPrivate = this[Keys.lockScreenPrivate] ?: true,

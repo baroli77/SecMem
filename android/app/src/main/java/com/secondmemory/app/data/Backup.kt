@@ -63,8 +63,7 @@ object Backup {
                     .put("appearance", settings.appearance.name)
                     .put("automaticProcessing", settings.automaticProcessing)
                     .put("lockScreenPrivate", settings.lockScreenPrivate)
-                    .put("pinExpiryHours", settings.pinExpiryHours)
-                    .put("isPro", settings.isPro),
+                    .put("pinExpiryHours", settings.pinExpiryHours),
             )
     }
 

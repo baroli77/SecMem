@@ -9,14 +9,14 @@ plugins {
 
 android {
     namespace = "com.secondmemory.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.secondmemory.app"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 16
-        versionName = "1.4.4"
+        targetSdk = 36
+        versionCode = 17
+        versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
     }
@@ -54,6 +54,11 @@ android {
         }
     }
 
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -70,6 +75,9 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+        jniLibs {
+            useLegacyPackaging = false
         }
     }
 }
