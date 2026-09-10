@@ -1,5 +1,6 @@
 package com.secondmemory.app.tile
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Build
 import android.service.quicksettings.Tile
@@ -42,7 +43,7 @@ class SaveTileService : TileService() {
                     ),
                 )
             } else {
-                @Suppress("DEPRECATION")
+                @SuppressLint("StartActivityAndCollapseDeprecated")
                 startActivityAndCollapse(intent)
             }
             return
