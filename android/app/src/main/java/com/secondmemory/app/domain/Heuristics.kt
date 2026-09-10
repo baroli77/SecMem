@@ -6,6 +6,7 @@ import java.util.Locale
 
 object Heuristics {
     private val URL_RE = Regex("""https?://[^\s<>"')\]]+""", RegexOption.IGNORE_CASE)
+    private val GEO_RE = Regex("""geo:[^\s<>"')\]]+""", RegexOption.IGNORE_CASE)
     private val YOUTUBE_RE = Regex("""(?:youtube\.com|youtu\.be)""", RegexOption.IGNORE_CASE)
     private val AMAZON_RE = Regex("""(?:amazon\.|amzn\.|amznto\.)""", RegexOption.IGNORE_CASE)
     private val REDDIT_RE = Regex("""(?:reddit\.com|redd\.it)""", RegexOption.IGNORE_CASE)
@@ -38,6 +39,7 @@ object Heuristics {
     )
 
     fun extractFirstUrl(text: String): String? {
+        GEO_RE.find(text)?.value?.let { return it.trim().trimEnd('.', ',', ';') }
         val match = URL_RE.find(text) ?: return null
         return match.value.replace(Regex("""[.,;:]+$"""), "")
     }
@@ -46,7 +48,7 @@ object Heuristics {
         val rawText = input.text?.trim().orEmpty()
         val explicitUrl = input.url?.trim()?.takeIf { it.isNotEmpty() } ?: extractFirstUrl(rawText)
         val mime = input.mimeType.orEmpty().lowercase(Locale.ROOT)
-        val hasFile = !input.imageUri.isNullOrBlank()
+        val hasFile = !input.imageUri.isNullOrBlank() || !input.pendingStream.isNullOrBlank()
         val isVcard = mime.contains("vcard") || rawText.contains("BEGIN:VCARD", ignoreCase = true)
         val isGeo = rawText.startsWith("geo:", ignoreCase = true) ||
             mime.contains("vnd.android.cursor.item/place") ||
@@ -326,12 +328,10 @@ object Heuristics {
         }
 
         Regex("""\b(20\d{2}-\d{2}-\d{2})\b""").find(content)?.let {
-            foundDate = true
             val parts = it.groupValues[1].split("-")
-            date = Calendar.getInstance().apply {
-                isLenient = false
-                set(parts[0].toInt(), parts[1].toInt() - 1, parts[2].toInt(), 0, 0, 0)
-                set(Calendar.MILLISECOND, 0)
+            parsedCalendar(parts[0].toInt(), parts[1].toInt() - 1, parts[2].toInt())?.let { cal ->
+                foundDate = true
+                date = cal
             }
         }
 
@@ -341,15 +341,9 @@ object Heuristics {
             var year = m.groupValues[3].toInt()
             if (year < 100) year += 2000
             if (day in 1..31 && month in 1..12) {
-                foundDate = true
-                date = Calendar.getInstance().apply {
-                    isLenient = false
-                    try {
-                        set(year, month - 1, day, 0, 0, 0)
-                        set(Calendar.MILLISECOND, 0)
-                    } catch (_: Exception) {
-                        foundDate = false
-                    }
+                parsedCalendar(year, month - 1, day)?.let { cal ->
+                    foundDate = true
+                    date = cal
                 }
             }
         }
@@ -380,41 +374,58 @@ object Heuristics {
 
         if (!foundDate && time == null) return DateTimeHit()
 
-        when {
-            hour != null -> {
-                date.set(Calendar.HOUR_OF_DAY, hour)
-                date.set(Calendar.MINUTE, minute)
-                date.set(Calendar.SECOND, 0)
-                date.set(Calendar.MILLISECOND, 0)
+        return try {
+            when {
+                hour != null -> {
+                    date.set(Calendar.HOUR_OF_DAY, hour)
+                    date.set(Calendar.MINUTE, minute)
+                    date.set(Calendar.SECOND, 0)
+                    date.set(Calendar.MILLISECOND, 0)
+                }
+                Regex("""\btonight\b""").containsMatchIn(text) -> {
+                    date.set(Calendar.HOUR_OF_DAY, 20)
+                    date.set(Calendar.MINUTE, 0)
+                    date.set(Calendar.SECOND, 0)
+                    date.set(Calendar.MILLISECOND, 0)
+                }
+                foundDate -> {
+                    date.set(Calendar.HOUR_OF_DAY, 9)
+                    date.set(Calendar.MINUTE, 0)
+                    date.set(Calendar.SECOND, 0)
+                    date.set(Calendar.MILLISECOND, 0)
+                }
             }
-            Regex("""\btonight\b""").containsMatchIn(text) -> {
-                date.set(Calendar.HOUR_OF_DAY, 20)
-                date.set(Calendar.MINUTE, 0)
-                date.set(Calendar.SECOND, 0)
-                date.set(Calendar.MILLISECOND, 0)
-            }
-            foundDate -> {
-                date.set(Calendar.HOUR_OF_DAY, 9)
-                date.set(Calendar.MINUTE, 0)
-                date.set(Calendar.SECOND, 0)
-                date.set(Calendar.MILLISECOND, 0)
-            }
-        }
 
-        val isoDate = "${date.get(Calendar.YEAR)}-${pad(date.get(Calendar.MONTH) + 1)}-${pad(date.get(Calendar.DAY_OF_MONTH))}"
-        var dueAt = if (foundDate || time != null) date.timeInMillis else null
-        if (dueAt != null && dueAt < now - 30_000L) {
-            val todayish = Regex("""\b(today|tonight)\b""").containsMatchIn(text)
-            if (!foundDate || todayish) {
-                date.add(Calendar.DAY_OF_YEAR, 1)
-                dueAt = date.timeInMillis
+            var dueAt = if (foundDate || time != null) date.timeInMillis else null
+            if (dueAt != null && dueAt < now - 30_000L) {
+                val todayish = Regex("""\b(today|tonight)\b""").containsMatchIn(text)
+                if (!foundDate || todayish) {
+                    date.add(Calendar.DAY_OF_YEAR, 1)
+                    dueAt = date.timeInMillis
+                }
             }
+            DateTimeHit(
+                isoDate = if (foundDate) "${date.get(Calendar.YEAR)}-${pad(date.get(Calendar.MONTH) + 1)}-${pad(date.get(Calendar.DAY_OF_MONTH))}" else null,
+                time = time,
+                dueAt = dueAt,
+            )
+        } catch (_: Exception) {
+            DateTimeHit()
         }
-        return DateTimeHit(
-            isoDate = if (foundDate) "${date.get(Calendar.YEAR)}-${pad(date.get(Calendar.MONTH) + 1)}-${pad(date.get(Calendar.DAY_OF_MONTH))}" else null,
-            time = time,
-            dueAt = dueAt,
-        )
+    }
+
+    private fun parsedCalendar(year: Int, monthZero: Int, day: Int): Calendar? {
+        if (monthZero !in 0..11 || day !in 1..31) return null
+        return try {
+            Calendar.getInstance().apply {
+                isLenient = false
+                set(year, monthZero, day, 0, 0, 0)
+                set(Calendar.MILLISECOND, 0)
+                timeInMillis
+            }
+        } catch (_: Exception) {
+            null
+        }
     }
 
     fun extractPerson(content: String): String? {

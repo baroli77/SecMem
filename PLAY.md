@@ -8,7 +8,7 @@
 |---|---|
 | App name | Second Memory |
 | Package | `com.secondmemory.app` — do not rename |
-| Version | **1.0.0** (`versionCode` 19) |
+| Version | **1.0.0** (`versionCode` 20) |
 | Price | **£3.99** one-time, UK store default |
 | Model | Paid app. No IAP. No ads. No subscription. |
 | Tagline | Pay once. No ads. No subscription. |
@@ -40,7 +40,7 @@ Everything lives on your phone. Optional encrypted backup. No account.
 - Feature graphic: 1024 × 500 PNG (`play/feature-graphic.png`)
 - Phone screenshots: `play/screenshot-pinned.png`, `play/screenshot-shade.png` (1080×1920)
 
-`versionCode` starts at **19** because sideloaded test APKs already used 1–18. Do not reset it.
+`versionCode` starts at **20** because sideloaded test APKs already used 1–19. Do not reset it.
 
 **Privacy policy URL** (required because the app uses INTERNET)
 

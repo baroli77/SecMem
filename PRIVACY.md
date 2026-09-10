@@ -20,7 +20,7 @@ Android’s notification permission is optional. If you decline it, pins still s
 
 ## Network
 
-The app may fetch a page title and description over **HTTPS** when you save a public link. That request goes to the site you saved, not to us. Cleartext HTTP is blocked.
+The app may fetch a page title, description and preview image over **HTTPS** when you save or open a public link. Title and description requests go to the site you saved. Preview images (`og:image`) may be loaded from that site’s image host. Cleartext HTTP is blocked.
 
 ## Backups
 

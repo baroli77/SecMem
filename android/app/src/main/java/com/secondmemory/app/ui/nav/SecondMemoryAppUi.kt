@@ -81,8 +81,11 @@ fun SecondMemoryAppUi(
         val onboardingDone = settings.onboardingComplete || onboardingDoneLocal
         val route = nav.currentBackStackEntryAsState().value?.destination?.route
 
+        var prevNotifs by remember { mutableStateOf(settings.notificationsEnabled) }
         LaunchedEffect(things, settings.notificationsEnabled) {
-            vm.syncShade(context)
+            val turningOn = settings.notificationsEnabled && !prevNotifs
+            prevNotifs = settings.notificationsEnabled
+            vm.syncShade(context, restoreMissing = turningOn)
         }
 
         fun markDone(id: String) {

@@ -31,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,6 +42,9 @@ import com.secondmemory.app.data.Backup
 import com.secondmemory.app.domain.Appearance
 import com.secondmemory.app.domain.Settings
 import com.secondmemory.app.notify.NotificationHelper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun SettingsScreen(
@@ -62,7 +66,9 @@ fun SettingsScreen(
     var pendingUri by remember { mutableStateOf<Uri?>(null) }
     var restorePassword by remember { mutableStateOf("") }
     var needPassword by remember { mutableStateOf(false) }
+    var confirmRestore by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
         if (uri != null) onExport(uri, password.takeIf { encrypt && it.isNotBlank() })
         encrypt = false
@@ -71,13 +77,16 @@ fun SettingsScreen(
     }
     val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        val bytes = runCatching { Backup.read(context, uri) }.getOrNull()
-        if (bytes != null && Backup.isEncrypted(bytes)) {
-            pendingUri = uri
-            restorePassword = ""
-            needPassword = true
-        } else if (uri != null) {
-            onImport(uri, null)
+        scope.launch {
+            val bytes = runCatching { withContext(Dispatchers.IO) { Backup.read(context, uri) } }.getOrNull()
+            if (bytes != null && Backup.isEncrypted(bytes)) {
+                pendingUri = uri
+                restorePassword = ""
+                needPassword = true
+            } else {
+                pendingUri = uri
+                confirmRestore = true
+            }
         }
     }
     Column(
@@ -124,6 +133,12 @@ fun SettingsScreen(
         }
 
         Label("Backup")
+        Text(
+            "Restore replaces everything currently on this phone with the backup.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 4.dp),
+        )
         TextButton(onClick = { pendingAction = "export"; exporter.launch("second-memory-backup.zip") }) {
             Text("Export backup")
         }
@@ -217,12 +232,15 @@ fun SettingsScreen(
                     onClick = {
                         val uri = pendingUri
                         needPassword = false
-                        pendingUri = null
-                        if (uri != null) onImport(uri, restorePassword)
-                        restorePassword = ""
+                        if (uri != null) {
+                            confirmRestore = true
+                        } else {
+                            pendingUri = null
+                            restorePassword = ""
+                        }
                     },
                     enabled = restorePassword.length >= 4,
-                ) { Text("Restore") }
+                ) { Text("Continue") }
             },
             dismissButton = {
                 TextButton(onClick = { needPassword = false; pendingUri = null; restorePassword = "" }) { Text("Cancel") }
@@ -257,6 +275,30 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { pendingAction = null; password = "" }) { Text("Cancel") }
+            },
+        )
+    }
+    if (confirmRestore) {
+        AlertDialog(
+            onDismissRequest = { confirmRestore = false; pendingUri = null; restorePassword = "" },
+            title = { Text("Replace everything?") },
+            text = {
+                Text("This backup will replace pins, Saved items and settings on this phone. It is not a merge.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val uri = pendingUri
+                        val pw = restorePassword.takeIf { it.isNotBlank() }
+                        confirmRestore = false
+                        pendingUri = null
+                        restorePassword = ""
+                        if (uri != null) onImport(uri, pw)
+                    },
+                ) { Text("Replace") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmRestore = false; pendingUri = null; restorePassword = "" }) { Text("Cancel") }
             },
         )
     }

@@ -20,6 +20,8 @@ import javax.crypto.spec.SecretKeySpec
 object Backup {
     private const val MAGIC = "SM1"
     private const val ITERATIONS = 120_000
+    const val MAX_BYTES = 40L * 1024 * 1024
+    const val MAX_ENTRIES = 250
 
     fun snapshot(things: List<Thing>, settings: Settings): JSONObject {
         val arr = JSONArray()
@@ -42,6 +44,13 @@ object Backup {
                     .put("status", t.status.name)
                     .put("priority", t.priority.name)
                     .put("dueAt", t.dueAt)
+                    .put("resurfaceAt", t.resurfaceAt)
+                    .put("completedAt", t.completedAt)
+                    .put("archivedAt", t.archivedAt)
+                    .put("lastOpenedAt", t.lastOpenedAt)
+                    .put("lastResurfacedAt", t.lastResurfacedAt)
+                    .put("resurfaceCount", t.resurfaceCount)
+                    .put("reasonForResurface", t.reasonForResurface)
                     .put("isPinned", t.isPinned)
                     .put("tags", t.tags.joinToString("|"))
                     .put("checklist", t.checklist)
@@ -74,6 +83,7 @@ object Backup {
             out.write(json.toString().toByteArray(Charsets.UTF_8))
             out.closeEntry()
             json.optJSONArray("things")?.let { arr ->
+                if (arr.length() > MAX_ENTRIES) error("Backup is too large")
                 for (i in 0 until arr.length()) {
                     val path = arr.getJSONObject(i).optString("imageUri")
                     if (path.isNullOrBlank()) continue
@@ -86,6 +96,7 @@ object Backup {
             }
         }
         val plain = zip.toByteArray()
+        if (plain.size > MAX_BYTES) error("Backup is too large")
         if (password.isNullOrBlank()) return plain
         return encrypt(plain, password)
     }
@@ -96,15 +107,21 @@ object Backup {
     }
 
     fun unpack(bytes: ByteArray, password: String?): Pair<JSONObject, Map<String, ByteArray>> {
+        if (bytes.isEmpty()) error("Not a Second Memory backup")
+        if (bytes.size > MAX_BYTES) error("Backup is too large")
         val encrypted = isEncrypted(bytes)
         if (encrypted && password.isNullOrBlank()) error("This backup is encrypted")
         val zipBytes = if (encrypted) decrypt(bytes, password!!) else bytes
         val files = mutableMapOf<String, ByteArray>()
-        var snapshot = JSONObject()
+        var snapshot: JSONObject? = null
+        var entries = 0
         ZipInputStream(zipBytes.inputStream()).use { zip ->
             var entry = zip.nextEntry
             while (entry != null) {
+                entries += 1
+                if (entries > MAX_ENTRIES) error("Backup is too large")
                 val data = zip.readBytes()
+                if (data.size > MAX_BYTES) error("Backup is too large")
                 if (entry.name == "snapshot.json") {
                     snapshot = JSONObject(String(data, Charsets.UTF_8))
                 } else if (entry.name.startsWith("captures/")) {
@@ -113,7 +130,9 @@ object Backup {
                 entry = zip.nextEntry
             }
         }
-        return snapshot to files
+        val json = snapshot ?: error("Not a Second Memory backup")
+        if (!json.has("things")) error("Not a Second Memory backup")
+        return json to files
     }
 
     private fun encrypt(plain: ByteArray, password: String): ByteArray {
@@ -146,9 +165,15 @@ object Backup {
     }
 
     fun write(context: Context, uri: Uri, bytes: ByteArray) {
-        context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+        val out = context.contentResolver.openOutputStream(uri)
+            ?: error("Couldn’t write the backup")
+        out.use { it.write(bytes) }
     }
 
-    fun read(context: Context, uri: Uri): ByteArray =
-        context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: ByteArray(0)
+    fun read(context: Context, uri: Uri): ByteArray {
+        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            ?: error("Couldn’t read the backup")
+        if (bytes.size > MAX_BYTES) error("Backup is too large")
+        return bytes
+    }
 }

@@ -231,7 +231,7 @@ object NotificationHelper {
             .setSilent(true)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setGroup(GROUP)
-            .setSortKey(thing.sortOrder.toString().padStart(8, '0'))
+            .setSortKey((thing.sortOrder + 1_000_000).coerceIn(0, 9_999_999).toString().padStart(7, '0'))
             .setColor(PinStyle.argb(thing.pinColor))
             .setVisibility(
                 if (settings.lockScreenPrivate) NotificationCompat.VISIBILITY_PRIVATE

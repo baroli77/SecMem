@@ -12,6 +12,7 @@ import com.secondmemory.app.domain.Settings
 import com.secondmemory.app.domain.Thing
 import com.secondmemory.app.domain.ThingStatus
 import com.secondmemory.app.notify.ShadeSync
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MemoryViewModel(private val repo: MemoryRepository) : ViewModel() {
     private val _settingsReady = MutableStateFlow(false)
@@ -89,7 +91,8 @@ class MemoryViewModel(private val repo: MemoryRepository) : ViewModel() {
         viewModelScope.launch { repo.setPriority(id, priority) }
     fun setExpiresAt(id: String, at: Long?) = viewModelScope.launch { repo.setExpiresAt(id, at) }
     fun movePin(id: String, delta: Int) = viewModelScope.launch { repo.movePin(id, delta) }
-    fun syncShade(context: Context) = viewModelScope.launch { ShadeSync.refresh(context, repo) }
+    fun syncShade(context: Context, restoreMissing: Boolean = false) =
+        viewModelScope.launch { ShadeSync.refresh(context, repo, restoreMissing) }
 
     fun exportBackup(
         context: Context,
@@ -98,9 +101,11 @@ class MemoryViewModel(private val repo: MemoryRepository) : ViewModel() {
         onDone: (Boolean, String) -> Unit,
     ) = viewModelScope.launch {
         runCatching {
-            val json = com.secondmemory.app.data.Backup.snapshot(things.value, settings.value)
-            val bytes = com.secondmemory.app.data.Backup.pack(context, json, password)
-            com.secondmemory.app.data.Backup.write(context, uri, bytes)
+            withContext(Dispatchers.IO) {
+                val json = com.secondmemory.app.data.Backup.snapshot(things.value, settings.value)
+                val bytes = com.secondmemory.app.data.Backup.pack(context, json, password)
+                com.secondmemory.app.data.Backup.write(context, uri, bytes)
+            }
         }.onSuccess { onDone(true, if (password.isNullOrBlank()) "Backup saved" else "Encrypted backup saved") }
             .onFailure { onDone(false, it.message ?: "Couldn’t export") }
     }
@@ -112,11 +117,16 @@ class MemoryViewModel(private val repo: MemoryRepository) : ViewModel() {
         onDone: (Boolean, String) -> Unit,
     ) = viewModelScope.launch {
         runCatching {
-            val bytes = com.secondmemory.app.data.Backup.read(context, uri)
-            val (json, files) = com.secondmemory.app.data.Backup.unpack(bytes, password)
-            repo.importSnapshot(json, files)
-            ShadeSync.refresh(context, repo)
-        }.onSuccess { onDone(true, "Restored") }
+            withContext(Dispatchers.IO) {
+                val bytes = com.secondmemory.app.data.Backup.read(context, uri)
+                val (json, files) = com.secondmemory.app.data.Backup.unpack(bytes, password)
+                val count = repo.importSnapshot(json, files)
+                ShadeSync.refresh(context, repo, restoreMissing = true)
+                count
+            }
+        }.onSuccess { count ->
+            onDone(true, if (count == 1) "Restored 1 item" else "Restored $count items")
+        }
             .onFailure {
                 val msg = when {
                     it.message?.contains("encrypted", true) == true -> "This backup is encrypted"

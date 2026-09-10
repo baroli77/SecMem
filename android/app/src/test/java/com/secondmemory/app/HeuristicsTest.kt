@@ -133,4 +133,42 @@ class HeuristicsTest {
         org.junit.Assert.assertNull(next.completedAt)
         org.junit.Assert.assertNull(next.resurfaceAt)
     }
+
+    @Test
+    fun geoUriIsLocationAndOpenable() {
+        val parsed = Heuristics.parseCaptureInput(
+            CaptureInput(text = "geo:53.4808,-2.2426?q=Manchester"),
+        )
+        assertEquals(Category.PLACE, parsed.category)
+        assertEquals(com.secondmemory.app.domain.ContentType.LOCATION, parsed.contentType)
+        assertTrue(parsed.sourceUrl!!.startsWith("geo:"))
+    }
+
+    @Test
+    fun pendingZipIsFileNotNote() {
+        val parsed = Heuristics.parseCaptureInput(
+            CaptureInput(
+                text = null,
+                mimeType = "application/zip",
+                fileName = "photos.zip",
+                pendingStream = "content://media/123",
+            ),
+        )
+        assertEquals(com.secondmemory.app.domain.ContentType.FILE, parsed.contentType)
+        assertEquals(Category.REFERENCE, parsed.category)
+    }
+
+    @Test
+    fun invalidIsoDateDoesNotThrow() {
+        val r = Heuristics.extractDateTime("due 2026-13-40")
+        org.junit.Assert.assertNull(r.isoDate)
+        org.junit.Assert.assertNull(r.dueAt)
+    }
+
+    @Test
+    fun invalidNumericDateDoesNotThrow() {
+        val r = Heuristics.extractDateTime("meet 31/02/2026")
+        org.junit.Assert.assertNull(r.isoDate)
+        org.junit.Assert.assertNull(r.dueAt)
+    }
 }

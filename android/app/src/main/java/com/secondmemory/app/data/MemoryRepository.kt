@@ -357,10 +357,11 @@ class MemoryRepository(
         settingsStore.update { Settings() }
     }
 
-    suspend fun importSnapshot(json: org.json.JSONObject, files: Map<String, ByteArray>) {
-        val arr = json.optJSONArray("things") ?: return
+    suspend fun importSnapshot(json: org.json.JSONObject, files: Map<String, ByteArray>): Int {
+        val arr = json.optJSONArray("things") ?: error("Not a Second Memory backup")
         val now = System.currentTimeMillis()
         val entities = mutableListOf<ThingEntity>()
+        val kept = mutableSetOf<String>()
         for (i in 0 until arr.length()) {
             val o = arr.getJSONObject(i)
             val oldPath = o.optString("imageUri").takeIf { it.isNotBlank() }
@@ -371,6 +372,7 @@ class MemoryRepository(
                 dest.outputStream().use { it.write(files.getValue(fileName)) }
                 imageUri = dest.absolutePath
             }
+            if (imageUri != null) kept += imageUri
             entities += Thing(
                 id = o.optString("id").ifBlank { Seed.nid() },
                 createdAt = o.optLong("createdAt", now),
@@ -388,20 +390,52 @@ class MemoryRepository(
                 category = runCatching { Category.valueOf(o.optString("category")) }.getOrDefault(Category.UNKNOWN),
                 status = runCatching { ThingStatus.valueOf(o.optString("status")) }.getOrDefault(ThingStatus.ACTIVE),
                 priority = runCatching { Priority.valueOf(o.optString("priority")) }.getOrDefault(Priority.NORMAL),
-                dueAt = o.optLong("dueAt").takeIf { o.has("dueAt") && !o.isNull("dueAt") && it != 0L },
+                dueAt = o.nullableLong("dueAt"),
+                resurfaceAt = o.nullableLong("resurfaceAt"),
+                completedAt = o.nullableLong("completedAt"),
+                archivedAt = o.nullableLong("archivedAt"),
+                lastOpenedAt = o.nullableLong("lastOpenedAt"),
+                lastResurfacedAt = o.nullableLong("lastResurfacedAt"),
+                resurfaceCount = o.optInt("resurfaceCount"),
+                reasonForResurface = o.optString("reasonForResurface").takeIf { it.isNotBlank() },
                 isPinned = o.optBoolean("isPinned"),
                 tags = o.optString("tags").split("|").filter { it.isNotBlank() },
                 checklist = o.optString("checklist"),
                 pinColor = o.optString("pinColor").ifBlank { "forest" },
                 sortOrder = o.optInt("sortOrder"),
-                expiresAt = o.optLong("expiresAt").takeIf { o.has("expiresAt") && !o.isNull("expiresAt") && it != 0L },
+                expiresAt = o.nullableLong("expiresAt"),
                 ogImageUrl = o.optString("ogImageUrl").takeIf { it.isNotBlank() },
                 siteName = o.optString("siteName").takeIf { it.isNotBlank() },
                 ocrText = o.optString("ocrText").takeIf { it.isNotBlank() },
+                detectedDate = o.optString("detectedDate").takeIf { it.isNotBlank() },
+                detectedTime = o.optString("detectedTime").takeIf { it.isNotBlank() },
+                detectedPerson = o.optString("detectedPerson").takeIf { it.isNotBlank() },
                 notifId = dao.maxNotifId() + 1 + i,
             ).toEntity()
         }
-        dao.upsertAll(entities)
+        write.withLock {
+            dao.deleteAll()
+            if (entities.isNotEmpty()) dao.upsertAll(entities)
+        }
+        CaptureFiles.pruneOrphans(capturesDir, kept)
+        json.optJSONObject("settings")?.let { s ->
+            settingsStore.update { cur ->
+                cur.copy(
+                    appearance = runCatching { com.secondmemory.app.domain.Appearance.valueOf(s.optString("appearance")) }
+                        .getOrDefault(cur.appearance),
+                    automaticProcessing = if (s.has("automaticProcessing")) s.optBoolean("automaticProcessing") else cur.automaticProcessing,
+                    lockScreenPrivate = if (s.has("lockScreenPrivate")) s.optBoolean("lockScreenPrivate") else cur.lockScreenPrivate,
+                    pinExpiryHours = if (s.has("pinExpiryHours")) s.optInt("pinExpiryHours") else cur.pinExpiryHours,
+                )
+            }
+        }
+        return entities.size
+    }
+
+    private fun org.json.JSONObject.nullableLong(key: String): Long? {
+        if (!has(key) || isNull(key)) return null
+        val value = optLong(key)
+        return value.takeIf { it != 0L }
     }
 
     private suspend fun patch(id: String, transform: suspend (Thing) -> Thing): Thing? = write.withLock {
