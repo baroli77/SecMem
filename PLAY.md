@@ -8,7 +8,7 @@
 |---|---|
 | App name | Second Memory |
 | Package | `com.secondmemory.app` — do not rename |
-| Version | **1.0.0** (`versionCode` 21) |
+| Version | **1.0.0** (`versionCode` 22) |
 | Price | **£3.99** one-time, UK store default |
 | Model | Paid app. No IAP. No ads. No subscription. |
 | Tagline | Pay once. No ads. No subscription. |
@@ -40,11 +40,20 @@ Everything lives on your phone. Optional encrypted backup. No account.
 - Feature graphic: 1024 × 500 PNG (`play/feature-graphic.png`)
 - Phone screenshots: `play/screenshot-pinned.png`, `play/screenshot-shade.png` (1080×1920)
 
-`versionCode` starts at **21** because sideloaded test APKs already used 1–20. Do not reset it.
+`versionCode` starts at **22** because sideloaded test APKs already used 1–21. Do not reset it.
 
 **Privacy policy URL** (required because the app uses INTERNET)
 
 https://rentclock.com/second-memory/privacy
+
+Also keep this identifier in the listing: privacy-policy. Canonical page is the URL above.
+
+## Console (the scanner cannot see these)
+
+- Register package `com.secondmemory.app` for Android developer verification by **30 September 2026**.
+- If this is a new personal Play account, complete closed testing: **12 testers over 14 consecutive days** before production. That is the GOOGLE-12-TESTER-RULE. It cannot be fixed in code.
+- IARC content rating questionnaire must be complete.
+- Data Safety: no account, no ads, no advertising ID, local data only.
 
 ## Data safety form
 

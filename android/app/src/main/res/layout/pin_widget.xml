@@ -12,8 +12,8 @@
         android:id="@+id/widget_count"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="0"
-        android:textColor="#F4EFE6"
+        android:text="@string/widget_count_fallback"
+        android:textColor="@color/widget_on"
         android:textSize="28sp"
         android:textStyle="bold" />
 
@@ -21,7 +21,7 @@
         android:id="@+id/widget_label"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="pinned"
-        android:textColor="#D4C7B0"
+        android:text="@string/widget_label"
+        android:textColor="@color/widget_muted"
         android:textSize="12sp" />
 </LinearLayout>

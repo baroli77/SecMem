@@ -2,13 +2,13 @@
 
 Canonical URL: [https://rentclock.com/second-memory/privacy](https://rentclock.com/second-memory/privacy)
 
-Last updated: 10 September 2026
+Last updated: 13 September 2026
 
 Second Memory is a local-first Android app. **Pay once. No ads. No subscription.**
 
 ## What we collect
 
-Nothing on our servers. There are no accounts, no analytics, no advertising identifiers, and no crash reporters in this app.
+Nothing on our servers. There are no accounts, no analytics, no advertising identifiers, and no crash reporters in this app. There is no advertising ID to opt-out of.
 
 ## What stays on your phone
 
@@ -30,7 +30,7 @@ Google cloud backup is turned off for this app.
 
 ## Sharing
 
-When you use Android’s share sheet, the other app sends content to Second Memory on your device. We do not upload it.
+When you use Android’s share sheet, the other app sends content to Second Memory on your device. We do not upload it. Pins, photos and files stay on this phone unless you export a backup. That export is user consent: it only happens when you tap Export.
 
 ## Children
 

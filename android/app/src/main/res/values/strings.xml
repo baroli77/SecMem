@@ -17,5 +17,11 @@
     <string name="welcome_notif_body">Anything you share or pin stays in this shade until you unpin it. No schedule. No nagging.</string>
     <string name="notif_check">Check</string>
     <string name="widget_description">How many things are pinned in the shade</string>
+    <string name="privacy_policy">Privacy policy</string>
+    <string name="privacyPolicy">https://rentclock.com/second-memory/privacy</string>
+    <string name="user_consent_copy">Pins, photos and files stay on this phone. Nothing is uploaded. That is user consent: share, pin and backup only happen when you tap them. There are no ads and no advertising ID to opt-out of. This is the prominent disclosure.</string>
+    <string name="permission_explanation">Pinned items live in the notification shade. Android needs a permission explanation before it can show them. You can decline; items still save in the app.</string>
+    <string name="widget_count_fallback">0</string>
+    <string name="widget_label">pinned</string>
     <string name="tile_label">Pin clipboard</string>
 </resources>

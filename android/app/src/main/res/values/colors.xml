@@ -3,6 +3,8 @@
     <color name="paper">#F3EFE6</color>
     <color name="ink">#1A1814</color>
     <color name="forest">#2C5C4F</color>
+    <color name="widget_on">#F4EFE6</color>
+    <color name="widget_muted">#D4C7B0</color>
     <color name="launcher_bg">#12110E</color>
     <color name="ic_launcher_background">#12110E</color>
 </resources>

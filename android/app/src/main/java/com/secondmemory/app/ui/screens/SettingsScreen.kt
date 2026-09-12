@@ -36,10 +36,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.secondmemory.app.BuildConfig
+import com.secondmemory.app.R
 import com.secondmemory.app.data.Backup
 import com.secondmemory.app.domain.Appearance
+import com.secondmemory.app.domain.Legal
 import com.secondmemory.app.domain.Settings
 import com.secondmemory.app.notify.NotificationHelper
 import kotlinx.coroutines.Dispatchers
@@ -104,7 +107,7 @@ fun SettingsScreen(
 
         Label("How it works")
         Text(
-            "Share a link, photo or note to Second Memory. It stays in your notification shade until you unpin it. Later snoozes it. Unpinning keeps it in Saved.",
+            stringResource(R.string.user_consent_copy),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -204,12 +207,12 @@ fun SettingsScreen(
             onClick = {
                 runCatching {
                     context.startActivity(
-                        Intent(Intent.ACTION_VIEW, Uri.parse("https://rentclock.com/second-memory/privacy")),
+                        Intent(Intent.ACTION_VIEW, Uri.parse(Legal.privacyPolicyUrl)),
                     )
                 }
             },
             modifier = Modifier.padding(bottom = 32.dp),
-        ) { Text("Privacy policy") }
+        ) { Text(stringResource(R.string.privacy_policy)) }
     }
     if (needPassword) {
         AlertDialog(

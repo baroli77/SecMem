@@ -56,6 +56,7 @@ import com.secondmemory.app.ui.screens.DetailScreen
 import com.secondmemory.app.ui.screens.LibraryScreen
 import com.secondmemory.app.ui.screens.OnboardingScreen
 import com.secondmemory.app.ui.screens.SettingsScreen
+import com.secondmemory.app.domain.Legal
 import com.secondmemory.app.ui.screens.TodayScreen
 import com.secondmemory.app.ui.theme.SecondMemoryTheme
 import kotlinx.coroutines.launch
@@ -342,10 +343,7 @@ fun SecondMemoryAppUi(
                 },
                 title = { Text("Allow notification pins") },
                 text = {
-                    Text(
-                        "Pinned things sit in your notification shade until you unpin them. " +
-                            "Share a link, a photo, a PDF — it stays put. You can turn this off in Settings.",
-                    )
+                    Text(Legal.showPermissionRationale() + " " + Legal.onDeviceConsent)
                 },
                 confirmButton = {
                     TextButton(
